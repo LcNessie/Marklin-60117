@@ -1,6 +1,8 @@
 import unittest
 import socket
 import json
+import logging
+import signal
 from unittest.mock import patch, MagicMock, ANY
 
 # Local module imports
@@ -46,12 +48,16 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.mock_constants = self.constants_patcher.start()
 
         self._configure_default_mocks()
+        
+        # Clear any existing handlers on the root logger to prevent test pollution
+        logging.getLogger().handlers = []
 
     def tearDown(self):
         """This method is run after each test to clean up the patches."""
         self.time_patcher.stop()
         self.config_patcher.stop()
         self.constants_patcher.stop()
+        logging.getLogger().handlers = []
 
     def _configure_default_mocks(self):
         """Sets up default values for our mocked config."""
@@ -66,6 +72,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
 
         self.mock_config.MQTT_STATUS_TOPIC = 'marklin/status'
         self.mock_config.MQTT_STATUS_INTERVAL_S = 1.0
+        self.mock_config.MQTT_BROKER_IP = '127.0.0.1'
 
         # Hardcoded constants
         self.mock_constants.CONNECTION_TIMEOUT_S = 10
@@ -95,6 +102,74 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.assertEqual(self.app.track_power, self.mock_constants.STATUS_UNKNOWN, "Initial track power should be UNKNOWN")
         self.assertEqual(self.app.packets_from_marklin, 0)
         self.assertEqual(self.app.packets_to_marklin, 0)
+        self.assertEqual(self.app.packets_from_mqtt, 0)
+        self.assertEqual(self.app.packets_to_mqtt, 0)
+
+    @patch('marklin_bridge.MarklinBridgeApp.ColoredFormatter')
+    @patch('marklin_bridge.coloredlogs', new_callable=MagicMock)
+    def test_setup_logging_uses_coloredlogs_if_available(self, mock_coloredlogs, mock_formatter):
+        """Tests that coloredlogs is used for console logging when available."""
+        # --- Arrange ---
+        self.mock_config.LOG_FILE = "" # Ensure console logging path
+
+        # --- Act ---
+        # Capture the startup log message
+        with self.assertLogs(level='INFO') as cm:
+            self.app._setup_logging()
+        self.assertIn("Starting Märklin UDP Bridge", cm.output[0])
+
+        # --- Assert ---
+        mock_coloredlogs.install.assert_called_once_with(level='INFO', fmt=ANY)
+        # Assert that our custom formatter was not instantiated, proving we didn't enter the 'else' block.
+        mock_formatter.assert_not_called()
+
+    @patch('marklin_bridge.logging.StreamHandler')
+    @patch('marklin_bridge.coloredlogs', None)
+    def test_setup_logging_falls_back_to_custom_formatter(self, mock_stream_handler):
+        """Tests that the custom formatter is used when coloredlogs is not available."""
+        # --- Arrange ---
+        self.mock_config.LOG_FILE = "" # Ensure console logging path
+
+        # --- Act ---
+        # Configure mock handler to have a valid level to prevent comparison errors
+        mock_stream_handler.return_value.level = 0
+        # Capture the startup log message
+        with self.assertLogs(level='INFO') as cm:
+            self.app._setup_logging()
+        self.assertIn("Starting Märklin UDP Bridge", cm.output[0])
+
+        # --- Assert ---
+        mock_stream_handler.assert_called_once()
+        # Check that the formatter set on the handler is the custom one
+        handler_instance = mock_stream_handler.return_value
+        handler_instance.setFormatter.assert_called_once()
+        formatter_arg = handler_instance.setFormatter.call_args[0][0]
+        self.assertIsInstance(formatter_arg, self.app.ColoredFormatter)
+
+    @patch('marklin_bridge.RotatingFileHandler')
+    @patch('marklin_bridge.coloredlogs', new_callable=MagicMock)
+    def test_setup_logging_uses_file_handler(self, mock_coloredlogs, mock_file_handler):
+        """Tests that RotatingFileHandler is used when a log file is configured."""
+        # --- Arrange ---
+        self.mock_config.LOG_FILE = "/var/log/test.log"
+        self.mock_config.LOG_FILE_MAX_SIZE_MB = 5
+        self.mock_config.LOG_FILE_BACKUP_COUNT = 3
+        expected_max_bytes = 5 * 1024 * 1024
+
+        # Configure mock handler to have a valid level
+        mock_file_handler.return_value.level = 0
+
+        # --- Act ---
+        # Capture the startup log message
+        with self.assertLogs(level='INFO') as cm:
+            self.app._setup_logging()
+        self.assertIn("Starting Märklin UDP Bridge", cm.output[0])
+
+        # --- Assert ---
+        mock_file_handler.assert_called_once_with(
+            "/var/log/test.log", maxBytes=expected_max_bytes, backupCount=3
+        )
+        mock_coloredlogs.install.assert_not_called()
 
     def test_handle_marklin_go_packet(self):
         """
@@ -106,6 +181,8 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.app.track_power = self.mock_constants.STATUS_UNKNOWN
         # This is a valid CAN frame for "System Go"
         go_packet = b'\x00\x00\x00\x00\x05\x00\x00\x00\x01\x00\x00\x00\x00'
+
+        self.app._publish_status = MagicMock()
 
         # --- Act ---
         self.app._handle_marklin_packet(go_packet)
@@ -123,6 +200,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 3. In bridge mode, the packet should be forwarded to the controller
         self.app.sock.sendto.assert_called_once_with(go_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
 
+        # 4. Should publish status (Link UP + Power GO = 2 calls)
+        self.assertEqual(self.app._publish_status.call_count, 2)
+
     def test_handle_marklin_stop_packet(self):
         """
         Tests the logic for when a 'System STOP' packet is received from the Märklin box.
@@ -133,6 +213,8 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.app.track_power = "GO"
         # This is a valid CAN frame for "System Stop"
         stop_packet = b'\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00'
+
+        self.app._publish_status = MagicMock()
 
         # --- Act ---
         self.app._handle_marklin_packet(stop_packet)
@@ -150,6 +232,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 3. In bridge mode, the packet should be forwarded to the controller
         self.app.sock.sendto.assert_called_once_with(stop_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
 
+        # 4. Should publish status (Power change only = 1 call)
+        self.app._publish_status.assert_called_once()
+
     def test_handle_marklin_packet_mqtt_mode(self):
         """
         Tests that in MQTT Gateway mode, a packet from the Märklin box is
@@ -158,6 +243,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # --- Arrange ---
         # Enable MQTT mode
         self.mock_config.MQTT_ENABLED = True
+        self.app.link_status = self.mock_constants.STATUS_UP # Start with link up to isolate test
         packet_from_marklin = b'some status data'
 
         # --- Act ---
@@ -173,8 +259,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 2. The UDP socket should NOT be used to forward the packet directly.
         self.app.sock.sendto.assert_not_called()
 
-        # 3. The packet counter should still be incremented.
+        # 3. The packet counters should be incremented.
         self.assertEqual(self.app.packets_from_marklin, 1)
+        self.assertEqual(self.app.packets_to_mqtt, 1)
 
     def test_connection_health_timeout(self):
         """
@@ -189,6 +276,8 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # Simulate time advancing just past the timeout threshold
         self.mock_time.return_value = 1000.0 + self.mock_constants.CONNECTION_TIMEOUT_S + 1
 
+        self.app._publish_status = MagicMock()
+
         # --- Act & Assert ---
         # Use assertLogs to capture the expected warning and prevent it from
         # printing to the console during the test run.
@@ -196,6 +285,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
             self.app._check_connection_health()
             # The test also asserts that the correct log message was generated.
             self.assertEqual(cm.output, ['WARNING:root:Link to Märklin interface lost (timeout).'])
+
+        # Should publish status immediately on timeout
+        self.app._publish_status.assert_called_once()
 
         # Assert state changes after the action
         # 1. State should be updated to reflect the lost link
@@ -310,14 +402,18 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # --- Arrange ---
         self.mock_config.MQTT_ENABLED = True
         self.app.mqtt_client = MagicMock() # Ensure we have a fresh mock
+        self.mock_config.MQTT_BROKER_IP = "10.0.0.1"
 
         # Set some state on the app to be reflected in the payload
         self.app.link_status = self.mock_constants.STATUS_UP
         self.app.track_power = "GO"
         self.app.packets_from_marklin = 123
         self.app.packets_to_marklin = 456
+        self.app.packets_from_mqtt = 789
+        self.app.packets_to_mqtt = 101
         self.app.last_source = '192.168.1.100'
         self.app.interface_status = { 'wlan0': self.mock_constants.STATUS_UP }
+        self.app.mqtt_status = "CONNECTED"
 
         expected_payload = {
             "version": "1.0.0",
@@ -326,7 +422,13 @@ class TestMarklinBridgeApp(unittest.TestCase):
             "interface_status": { 'wlan0': self.mock_constants.STATUS_UP },
             "packets_from_marklin": 123,
             "packets_to_marklin": 456,
-            "last_source": "192.168.1.100"
+            "packets_from_mqtt": 789,
+            "packets_to_mqtt": 101,
+            "marklin_ip": "192.168.160.1",
+            "mqtt_broker_ip": "10.0.0.1",
+            "mqtt_status": "CONNECTED",
+            "marklin_interface": "wlan0",
+            "home_interface": "eth0"
         }
 
         # --- Act ---
@@ -340,6 +442,15 @@ class TestMarklinBridgeApp(unittest.TestCase):
             json.dumps(expected_payload, indent=4),
             retain=True
         )
+
+    def test_signal_handler_sets_running_false(self):
+        """Tests that the signal handler stops the main loop."""
+        self.app.running = True
+        # Use assertLogs to capture the INFO message about the shutdown signal
+        with self.assertLogs(level='INFO') as cm:
+            self.app._signal_handler(signal.SIGTERM, None)
+            self.assertIn("Received signal", cm.output[0])
+        self.assertFalse(self.app.running)
 
     def test_main_loop_calls_core_functions_and_publishes_status(self):
         """

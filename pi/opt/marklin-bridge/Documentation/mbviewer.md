@@ -1,55 +1,92 @@
-# Diagnostics Tool (`mbviewer.py`)
+# Status Monitor Guide
 
-The `mbviewer.py` script is a real-time, terminal-based dashboard for monitoring the status of the Märklin Bridge application. It provides a quick and easy way to verify that all components of the system are working correctly.
+<< [Home](../README.md) | [Installation Guide](INSTALL.md) | [Troubleshooting](TROUBLESHOOTING.md) | **Status Monitor** | [Robustness](ROBUSTNESS.md) | [Updating](UPDATING.md) | [Changelog](CHANGELOG.md) | [Code of Conduct](CODE_OF_CONDUCT.md)
 
-## Running the Tool
+---
 
-To run the tool, simply execute it with Python from the `pi/opt/marklin-bridge` directory:
+The **Märklin UDP Bridge Status Monitor** (`mbviewer.py`) is a real-time, terminal-based dashboard. It connects to the MQTT broker to visualize the telemetry data published by the main bridge application. This allows you to monitor the health of the UDP link to the tracks, the MQTT connection, and traffic statistics without needing to SSH into the Pi and tail logs.
+
+## Prerequisites
+
+The viewer runs on any machine that has Python 3 and network access to your MQTT broker. It does not need to run on the Raspberry Pi itself, although it often does.
+
+### Dependencies
+
+*   **Python 3**
+*   **paho-mqtt**
+*   **windows-curses** (Windows only)
+
+To install dependencies:
 
 ```bash
-python3 mbviewer.py
+pip install paho-mqtt
+# On Windows only:
+pip install windows-curses
 ```
 
-The dashboard will appear in your terminal. Press `q` or `Ctrl+C` to exit.
+## Usage
 
-## Understanding the Dashboard
+To launch the viewer, run the script from the terminal:
 
-The dashboard is split into several sections, each providing specific information about the bridge's status.
+```bash
+# Linux / macOS
+./mbviewer.py
 
-### MQTT Connection
+# Windows
+python mbviewer.py
+```
 
-This section shows the status of the diagnostic tool's own connection to the MQTT broker.
+### Command Line Arguments
 
-- **Broker Status:**
-  - `🟢 CONNECTED`: The tool is successfully connected to the MQTT broker and is receiving status updates.
-  - `🔴 DISCONNECTED`: The tool has lost its connection to the broker.
-  - `🟡 CONNECTING` / `FAILED`: The tool is attempting to connect or has failed to connect. Check that the broker IP and port are configured correctly in `config.py` and that the broker is running.
+By default, the viewer tries to connect to an MQTT broker on `127.0.0.1` (localhost). You can configure the connection using command-line arguments:
 
-### Bridge Status
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--broker` | `127.0.0.1` | The IP address or hostname of the MQTT broker. |
+| `--port` | `1883` | The port of the MQTT broker. |
+| `--topic` | `marklin/status` | The MQTT topic where the bridge publishes its status. |
+| `--username` | *None* | Username for MQTT authentication. |
+| `--password` | *None* | Password for MQTT authentication. |
 
-This section displays the core status of the main bridge application, as reported in the MQTT status messages.
+**Example:** Connecting to a remote broker:
 
--   **Version:** The version of the running Märklin Bridge application.
--   **UDP Link:** The status of the direct UDP connection between the bridge and the Märklin network interface box (e.g., 60117).
-    -   `🟢 UP`: The bridge is receiving UDP packets from the Märklin box.
-    -   `😵 DOWN`: The bridge has not received any UDP packets from the Märklin box within the expected timeout. This indicates a potential problem with the physical connection or the Märklin box itself.
--   **Track Power:** The last known status of the track power.
-    -   `🟢 GO`: Track power is on.
-    -   `🔴 STOP`: Track power is off.
-    -   `🟡 UNKNOWN`: The bridge has not yet received a message indicating the track power status.
+```bash
+python mbviewer.py --broker 192.168.1.10 --username myuser --password mypass
+```
 
-### Network Interfaces
+## Interface Guide
 
-This section shows the status of the network interfaces on the machine running the bridge (e.g., the Raspberry Pi).
+The dashboard is divided into three main sections:
 
--   For each interface (e.g., `eth0`, `wlan0`):
-    -   `🟢 UP`: The interface is active and has an IP address.
-    -   `🔴 DOWN`: The interface is down or not configured.
+### 1. Bridge
+Displays general application information.
+*   **Version:** The version of the `marklin-bridge` service running.
 
-### Bridge Activity
+### 2. Märklin Side
+Monitors the connection between the Raspberry Pi and the Märklin 60117/60113 Box (CS3).
 
-This section provides a live look at the packet counters.
+*   **Interface:** The network interface on the Pi used for this connection (e.g., `wlan0`). Shows connection status and SSID.
+*   **Marklin Bridge IP:** The IP address of the Pi on this interface.
+*   **Marklin Wifi Box IP:** The target IP of the Märklin hardware.
+*   **UDP Link:**
+    *   🟢 `UP`: The bridge is successfully exchanging packets with the Märklin box.
+    *   🔴 `DOWN`: No packets received recently. The link is broken.
+*   **Track Power:**
+    *   🟢 `GO`: Track power is ON.
+    *   🔴 `STOP`: Track power is OFF (Emergency Stop).
+    *   😵 `UNKNOWN`: State cannot be determined (usually because the link is down).
+*   **UDP Counters:** Total packets sent and received over UDP.
 
--   **From Box:** A counter of UDP packets received by the bridge *from* the Märklin network interface.
--   **To Box:** A counter of UDP packets sent *to* the Märklin network interface from the bridge.
--   **Last Source:** The IP address and port of the last device that sent a command to the bridge.
+### 3. Network Side
+Monitors the connection between the Raspberry Pi and your home network/MQTT broker.
+
+*   **Interface:** The network interface used (e.g., `eth0`).
+*   **Bridge Home IP:** The IP address of the Pi on your home LAN.
+*   **MQTT Broker IP:** The configured broker address.
+*   **Bridge MQTT Status:**
+    *   🟢 `CONNECTED`: The bridge service is successfully talking to the broker.
+    *   🔴 `FAILED`: The bridge service cannot connect.
+*   **MQTT Counters:** Total packets sent and received over MQTT.
+
+### Viewer MQTT
+At the bottom, the **Viewer MQTT** status indicates if *this viewer application* is successfully connected to the broker.

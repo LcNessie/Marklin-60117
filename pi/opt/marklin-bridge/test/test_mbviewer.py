@@ -1,6 +1,6 @@
 import sys
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, ANY
 
 # Mock the curses module at a high level to ensure tests can be discovered.
 sys.modules['curses'] = Mock()
@@ -14,20 +14,22 @@ class TestMqttCallbacks(unittest.TestCase):
         userdata = {'connection_status': '', 'topic': 'test/topic'}
         mock_client = Mock()
         
-        mbviewer.on_connect(mock_client, userdata, None, 0)
+        # Paho v2 signature: client, userdata, flags, reason_code, properties
+        mbviewer.on_connect(mock_client, userdata, None, 0, None)
         self.assertEqual(userdata['connection_status'], "CONNECTED")
         mock_client.subscribe.assert_called_with('test/topic')
 
         mock_client.reset_mock()
         
-        mbviewer.on_connect(mock_client, userdata, None, 1)
+        mbviewer.on_connect(mock_client, userdata, None, 1, None)
         self.assertEqual(userdata['connection_status'], "FAILED (1)")
         mock_client.subscribe.assert_not_called()
 
     def test_on_disconnect(self):
         """Test the on_disconnect MQTT callback."""
         userdata = {'connection_status': 'CONNECTED'}
-        mbviewer.on_disconnect(None, userdata, 0)
+        # Paho v2 signature: client, userdata, disconnect_flags, reason_code, properties
+        mbviewer.on_disconnect(None, userdata, None, 0, None)
         self.assertEqual(userdata['connection_status'], "DISCONNECTED")
 
     def test_on_message(self):
@@ -75,21 +77,63 @@ class TestCursesUI(unittest.TestCase):
     def test_draw_waiting_for_message(self):
         """Test drawing when waiting for the first message."""
         self.ui.draw(None, "CONNECTING")
-        # Line number trace: 2 (title) + 1 (blank) + 1 (status) + 1 (blank) = 5
-        self.mock_stdscr.addstr.assert_any_call(5, 0, "Waiting for first status message...", self.ui.COLOR_PAIR_YELLOW)
+        # Use ANY for line number to accommodate layout changes
+        self.mock_stdscr.addstr.assert_any_call(ANY, 0, "Waiting for first status message...", self.ui.COLOR_PAIR_YELLOW)
 
     def test_draw_with_status_data(self):
         """Test drawing with a full set of status data."""
+        # Updated data format to include rich interface info (dict) and legacy info (string)
         status_data = {
             'version': '1.2.3', 'link_status': 'UP', 'track_power': 'GO',
-            'interface_status': {'eth0': 'UP', 'wlan0': 'DOWN'},
-            'packets_from_marklin': 123, 'packets_to_marklin': 456, 'last_source': '192.168.1.10'
+            'interface_status': {
+                'eth0': {'status': 'UP', 'ip': '192.168.1.50'}, 
+                'wlan0': {'status': 'UP', 'ssid': 'TestWiFi', 'ip': '192.168.1.105'}
+            },
+            'packets_from_marklin': 123, 'packets_to_marklin': 456, 'last_source': '192.168.1.10',
+            'packets_from_mqtt': 789, 'packets_to_mqtt': 101,
+            'marklin_ip': '192.168.160.1',
+            'mqtt_broker_ip': '192.168.1.1',
+            'mqtt_status': 'CONNECTED',
+            'marklin_interface': 'wlan0',
+            'home_interface': 'eth0'
         }
         self.ui.draw(status_data, "CONNECTED")
-        # Line number trace: 5 (from above) + 1 (title) + 1 = 7
-        self.mock_stdscr.addstr.assert_any_call(6, 20, "1.2.3", self.ui.COLOR_PAIR_DEFAULT)
-        self.mock_stdscr.addstr.assert_any_call(8, 20, "🟢 GO", self.ui.COLOR_PAIR_GREEN)
-        self.mock_stdscr.addstr.assert_any_call(12, 20, "🔴 DOWN", self.ui.COLOR_PAIR_RED)
+        
+        # Use ANY for line numbers as layout is complex. Verify headers and content.
+        self.mock_stdscr.addstr.assert_any_call(ANY, 0, "-- Bridge --", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 0, "-- Märklin Side --", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 0, "-- Network Side --", self.ui.COLOR_PAIR_DEFAULT)
+
+        # Core Data
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "1.2.3", self.ui.COLOR_PAIR_DEFAULT)
+        
+        # Leg 1 Data (Marklin/WiFi)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 2, "Interface (wlan0):", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "🟢 UP (TestWiFi)", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "192.168.1.105", self.ui.COLOR_PAIR_DEFAULT) # Marklin Bridge IP
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "192.168.160.1", self.ui.COLOR_PAIR_DEFAULT) # Marklin Wifi Box IP
+        self.mock_stdscr.addstr.assert_any_call(ANY, 2, "UDP from Marklin:", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 2, "UDP to Marklin:", self.ui.COLOR_PAIR_DEFAULT)
+
+        # Leg 2 Data (Downlink/Interfaces)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 2, "Interface (eth0):", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "🟢 UP", self.ui.COLOR_PAIR_DEFAULT) # eth0
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "192.168.1.1", self.ui.COLOR_PAIR_DEFAULT) # MQTT Broker IP
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "🟢 CONNECTED", self.ui.COLOR_PAIR_GREEN) # Bridge MQTT Status
+        self.mock_stdscr.addstr.assert_any_call(ANY, 2, "MQTT from Broker:", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 2, "MQTT to Broker:", self.ui.COLOR_PAIR_DEFAULT)
+
+    def test_draw_box_down_scenario(self):
+        """Test drawing when the UDP link is down (Scenario 2)."""
+        status_data = {
+            'link_status': 'DOWN', 'track_power': 'UNKNOWN',
+            'interface_status': {}
+        }
+        self.ui.draw(status_data, "CONNECTED")
+
+        # Verify icons for Box Down scenario
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "🔴 DOWN", self.ui.COLOR_PAIR_RED)
+        self.mock_stdscr.addstr.assert_any_call(ANY, 24, "😵 UNKNOWN", self.ui.COLOR_PAIR_YELLOW)
 
     def test_draw_ignores_curses_error(self):
         """Test that draw method handles curses errors gracefully."""

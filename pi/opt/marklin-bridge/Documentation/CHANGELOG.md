@@ -1,6 +1,6 @@
 # Changelog
 
-[<< Home](../README.md) | [Installation Guide](INSTALL.md) | [Troubleshooting](TROUBLESHOOTING.md) | [Robustness](ROBUSTNESS.md) | [Updating](UPDATING.md) | **Changelog** | [Code of Conduct](CODE_OF_CONDUCT.md)
+<< Home | Installation Guide | Troubleshooting | Status Monitor | Robustness | Updating | **Changelog** | Code of Conduct
 
 ---
 

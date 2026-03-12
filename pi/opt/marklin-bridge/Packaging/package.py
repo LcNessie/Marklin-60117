@@ -51,7 +51,9 @@ ignore_patterns = shutil.ignore_patterns(
     '.gitignore',    # Exclude git files
     'build',         # Exclude the build directory itself
     '__pycache__',   # Exclude python cache directories
-    '*.pyc'          # Exclude python cache files
+    '*.pyc',         # Exclude python cache files
+    'venv',          # Exclude virtual environment
+    '.venv'          # Exclude virtual environment (common alternative name)
 )
 
 # Copy the entire source root to the package directory, excluding ignored files.

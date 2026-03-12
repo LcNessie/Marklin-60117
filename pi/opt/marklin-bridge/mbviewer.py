@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 import argparse
-import curses
 import json
 import locale
 import time
 import paho.mqtt.client as mqtt
+
+try:
+    import curses
+except ImportError:
+    import sys
+    if sys.platform == 'win32':
+        sys.exit("Error: 'curses' module not found. Please install it via pip: pip install windows-curses")
+    else:
+        raise
 
 # --- Default Configuration ---
 DEFAULT_BROKER_IP = "127.0.0.1"
@@ -12,7 +20,7 @@ DEFAULT_BROKER_PORT = 1883
 DEFAULT_STATUS_TOPIC = "marklin/status"
 
 class CursesUI:
-    """Manages the curses-based terminal user interface for the diagnostic tool."""
+    """Manages the curses-based terminal user interface for the status monitor."""
 
     def __init__(self, stdscr):
         """Initializes the curses screen and color pairs."""
@@ -39,91 +47,151 @@ class CursesUI:
         """Draws the entire UI based on the application's state."""
         try:
             self.stdscr.erase()
-            self.stdscr.addstr(0, 0, f"Märklin Bridge Diagnostics Tool", self.COLOR_PAIR_DEFAULT)
+            self.stdscr.addstr(0, 0, f"Märklin Bridge Status Monitor", self.COLOR_PAIR_DEFAULT)
             next_line = 2
+            
+            # Helper to safely get data
+            def get_val(key, default='N/A'):
+                return status_data.get(key, default) if status_data else default
 
-            # --- Connection Status ---
-            self.stdscr.addstr(next_line, 0, "-- MQTT Connection --", self.COLOR_PAIR_DEFAULT)
+            # Helper to extract interface info
+            def get_iface_info(iface_name):
+                ifaces = get_val('interface_status', {})
+                info = ifaces.get(iface_name, {})
+                if isinstance(info, dict):
+                    return info.get('status', 'UNKNOWN'), info.get('ip', 'N/A'), info.get('ssid')
+                return info or 'UNKNOWN', 'N/A', None
+
+            # --- [ CORE ] ---
+            self.stdscr.addstr(next_line, 0, "-- Bridge --", self.COLOR_PAIR_DEFAULT)
             next_line += 1
-            if connection_status == "CONNECTED":
-                conn_icon, conn_color = "🟢", self.COLOR_PAIR_GREEN
-            elif connection_status == "DISCONNECTED":
-                conn_icon, conn_color = "🔴", self.COLOR_PAIR_RED
-            else:
-                conn_icon, conn_color = "🟡", self.COLOR_PAIR_YELLOW
-            self.stdscr.addstr(next_line, 2, "Broker Status:", self.COLOR_PAIR_DEFAULT)
-            self.stdscr.addstr(next_line, 20, f"{conn_icon} {connection_status}", conn_color)
+            self.stdscr.addstr(next_line, 2, "Version:", self.COLOR_PAIR_DEFAULT)
+            self.stdscr.addstr(next_line, 24, f"{get_val('version')}", self.COLOR_PAIR_DEFAULT)
+            next_line += 1
             next_line += 2
+
+            # --- [ LEG 1 ] Märklin Interface (WiFi) ---
+            self.stdscr.addstr(next_line, 0, "-- Märklin Side --", self.COLOR_PAIR_DEFAULT)
+            next_line += 1
 
             if not status_data:
                 self.stdscr.addstr(next_line, 0, "Waiting for first status message...", self.COLOR_PAIR_YELLOW)
-                self.stdscr.refresh()
-                return
-
-            # --- System Status ---
-            self.stdscr.addstr(next_line, 0, "-- Bridge Status --", self.COLOR_PAIR_DEFAULT)
-            next_line += 1
-            self.stdscr.addstr(next_line, 2, "Version:", self.COLOR_PAIR_DEFAULT)
-            self.stdscr.addstr(next_line, 20, f"{status_data.get('version', 'N/A')}", self.COLOR_PAIR_DEFAULT)
-            next_line += 1
-            self.stdscr.addstr(next_line, 2, "UDP Link:", self.COLOR_PAIR_DEFAULT)
-            link_status = status_data.get('link_status', 'UNKNOWN')
-            if link_status == "DOWN":
-                link_icon, link_color = "😵", self.COLOR_PAIR_YELLOW
             else: # UP
-                link_icon, link_color = "🟢", self.COLOR_PAIR_DEFAULT
-            self.stdscr.addstr(next_line, 20, f"{link_icon} {link_status}", link_color)
-            next_line += 1
-            self.stdscr.addstr(next_line, 2, "Track Power:", self.COLOR_PAIR_DEFAULT)
-            track_power = status_data.get('track_power', 'UNKNOWN')
-            if track_power == "GO": power_icon, power_color = "🟢", self.COLOR_PAIR_GREEN
-            elif track_power == "STOP": power_icon, power_color = "🔴", self.COLOR_PAIR_RED
-            else: power_icon, power_color = "🟡", self.COLOR_PAIR_YELLOW
-            self.stdscr.addstr(next_line, 20, f"{power_icon} {track_power}", power_color)
+                marklin_iface = get_val('marklin_interface', 'wlan0')
+                status, ip, ssid = get_iface_info(marklin_iface)
+                
+                if status == "UP": icon, color = "🟢", self.COLOR_PAIR_DEFAULT
+                else: icon, color = "🔴", self.COLOR_PAIR_RED
+                
+                if ssid:
+                    self.stdscr.addstr(next_line, 2, f"Interface ({marklin_iface}):", self.COLOR_PAIR_DEFAULT)
+                    self.stdscr.addstr(next_line, 24, f"{icon} {status} ({ssid})", color)
+                else:
+                    self.stdscr.addstr(next_line, 2, f"Interface ({marklin_iface}):", self.COLOR_PAIR_DEFAULT)
+                    self.stdscr.addstr(next_line, 24, f"{icon} {status}", color)
+                next_line += 1
+
+                self.stdscr.addstr(next_line, 2, "Marklin Bridge IP:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, ip, self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+
+                # Target IP (60117)
+                target_ip = get_val('marklin_ip', 'N/A')
+                self.stdscr.addstr(next_line, 2, "Marklin Wifi Box IP:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, target_ip, self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+
+                # UDP Link
+                link_status = get_val('link_status', 'UNKNOWN')
+                if link_status == "DOWN": link_icon, link_color = "🔴", self.COLOR_PAIR_RED
+                else: link_icon, link_color = "🟢", self.COLOR_PAIR_DEFAULT
+                self.stdscr.addstr(next_line, 2, "UDP Link:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{link_icon} {link_status}", link_color)
+                next_line += 1
+
+                # Track Power
+                track_power = get_val('track_power', 'UNKNOWN')
+                if track_power == "GO": power_icon, power_color = "🟢", self.COLOR_PAIR_GREEN
+                elif track_power == "STOP": power_icon, power_color = "🔴", self.COLOR_PAIR_RED
+                else: power_icon, power_color = "😵", self.COLOR_PAIR_YELLOW
+                self.stdscr.addstr(next_line, 2, "Track Power:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{power_icon} {track_power}", power_color)
+                next_line += 1
+
+                self.stdscr.addstr(next_line, 2, "UDP from Marklin:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{get_val('packets_from_marklin', 0)}", self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+                self.stdscr.addstr(next_line, 2, "UDP to Marklin:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{get_val('packets_to_marklin', 0)}", self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+
             next_line += 2
 
-            # --- Interface Status ---
-            self.stdscr.addstr(next_line, 0, "-- Network Interfaces --", self.COLOR_PAIR_DEFAULT)
-            next_line += 1
-            ifaces = status_data.get('interface_status', {})
-            if ifaces:
-                for iface, status in ifaces.items():
-                    if status == "UP": iface_icon, iface_color = "🟢", self.COLOR_PAIR_DEFAULT
-                    else: iface_icon, iface_color = "🔴", self.COLOR_PAIR_RED
-                    self.stdscr.addstr(next_line, 2, f"{iface}:", self.COLOR_PAIR_DEFAULT)
-                    self.stdscr.addstr(next_line, 20, f"{iface_icon} {status}", iface_color)
-                    next_line += 1
-            else:
-                self.stdscr.addstr(next_line, 2, "No interface data available.", self.COLOR_PAIR_YELLOW)
-                next_line += 1
+            # --- [ LEG 2 ] Downlink (LAN/MQTT) ---
+            self.stdscr.addstr(next_line, 0, "-- Network Side --", self.COLOR_PAIR_DEFAULT)
             next_line += 1
 
-            # --- Bridge Activity ---
-            self.stdscr.addstr(next_line, 0, "-- Bridge Activity --", self.COLOR_PAIR_DEFAULT)
+            if status_data:
+                home_iface = get_val('home_interface', 'eth0')
+                status, ip, ssid = get_iface_info(home_iface)
+
+                if status == "UP": icon, color = "🟢", self.COLOR_PAIR_DEFAULT
+                else: icon, color = "🔴", self.COLOR_PAIR_RED
+
+                if ssid:
+                    self.stdscr.addstr(next_line, 2, f"Interface ({home_iface}):", self.COLOR_PAIR_DEFAULT)
+                    self.stdscr.addstr(next_line, 24, f"{icon} {status} ({ssid})", color)
+                else:
+                    self.stdscr.addstr(next_line, 2, f"Interface ({home_iface}):", self.COLOR_PAIR_DEFAULT)
+                    self.stdscr.addstr(next_line, 24, f"{icon} {status}", color)
+                next_line += 1
+
+                self.stdscr.addstr(next_line, 2, "Bridge Home IP:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, ip, self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+
+                self.stdscr.addstr(next_line, 2, "MQTT Broker IP:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{get_val('mqtt_broker_ip')}", self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+
+                mqtt_status = get_val('mqtt_status', 'UNKNOWN')
+                if mqtt_status == "CONNECTED": mqtt_icon, mqtt_color = "🟢", self.COLOR_PAIR_GREEN
+                else: mqtt_icon, mqtt_color = "🔴", self.COLOR_PAIR_RED
+                self.stdscr.addstr(next_line, 2, "Bridge MQTT Status:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{mqtt_icon} {mqtt_status}", mqtt_color)
+                next_line += 1
+
+                self.stdscr.addstr(next_line, 2, "MQTT from Broker:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{get_val('packets_from_mqtt', 0)}", self.COLOR_PAIR_DEFAULT)
+                next_line += 1
+                self.stdscr.addstr(next_line, 2, "MQTT to Broker:", self.COLOR_PAIR_DEFAULT)
+                self.stdscr.addstr(next_line, 24, f"{get_val('packets_to_mqtt', 0)}", self.COLOR_PAIR_DEFAULT)
+                next_line += 2
+
+            # Viewer MQTT Connection
+            if connection_status == "CONNECTED": conn_icon, conn_color = "🟢", self.COLOR_PAIR_GREEN
+            elif connection_status == "DISCONNECTED": conn_icon, conn_color = "🔴", self.COLOR_PAIR_RED
+            else: conn_icon, conn_color = "🟡", self.COLOR_PAIR_YELLOW
+            self.stdscr.addstr(next_line, 2, "Viewer MQTT:", self.COLOR_PAIR_DEFAULT)
+            self.stdscr.addstr(next_line, 24, f"{conn_icon} {connection_status}", conn_color)
             next_line += 1
-            self.stdscr.addstr(next_line, 2, "From Box:", self.COLOR_PAIR_DEFAULT)
-            self.stdscr.addstr(next_line, 20, f"{status_data.get('packets_from_marklin', 0)}", self.COLOR_PAIR_DEFAULT)
-            next_line += 1
-            self.stdscr.addstr(next_line, 2, "To Box:", self.COLOR_PAIR_DEFAULT)
-            self.stdscr.addstr(next_line, 20, f"{status_data.get('packets_to_marklin', 0)}", self.COLOR_PAIR_DEFAULT)
-            next_line += 1
-            self.stdscr.addstr(next_line, 2, "Last Source:", self.COLOR_PAIR_DEFAULT)
-            self.stdscr.addstr(next_line, 20, f"{status_data.get('last_source', 'N/A')}", self.COLOR_PAIR_DEFAULT)
+
+            # --- Bridge Activity (Legacy Grouping Removed, merged into Core/Legs) ---
             
-            self.stdscr.addstr(next_line + 2, 0, "Press 'q' or Ctrl+C to exit.", self.COLOR_PAIR_DEFAULT)
+            self.stdscr.addstr(next_line + 1, 0, "Press 'q' or Ctrl+C to exit.", self.COLOR_PAIR_DEFAULT)
             self.stdscr.refresh()
         except self.curses.error:
             pass # Ignore screen resize errors
 
-def on_connect(client, userdata, flags, rc):
-    """Callback for when connection to MQTT broker is established."""
-    if rc == 0:
+def on_connect(client, userdata, flags, reason_code, properties):
+    """Callback for when connection to MQTT broker is established (Paho v2)."""
+    if reason_code == 0:
         userdata['connection_status'] = "CONNECTED"
         client.subscribe(userdata['topic'])
     else:
-        userdata['connection_status'] = f"FAILED ({rc})"
+        userdata['connection_status'] = f"FAILED ({reason_code})"
 
-def on_disconnect(client, userdata, rc):
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     """Callback for when the client disconnects from the MQTT broker."""
     userdata['connection_status'] = "DISCONNECTED"
 
@@ -145,7 +213,7 @@ def main_loop(stdscr, args):
         'topic': args.topic
     }
 
-    client = mqtt.Client(userdata=userdata)
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, userdata=userdata)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
     client.on_message = on_message
@@ -188,7 +256,7 @@ def main_loop(stdscr, args):
 
 def main():
     """Parses arguments and starts the curses wrapper."""
-    parser = argparse.ArgumentParser(description="A real-time diagnostic tool for the Märklin UDP Bridge.")
+    parser = argparse.ArgumentParser(description="A real-time status monitor for the Märklin UDP Bridge.")
     parser.add_argument('--broker', default=DEFAULT_BROKER_IP, help=f"IP address of the MQTT broker (default: {DEFAULT_BROKER_IP})")
     parser.add_argument('--port', type=int, default=DEFAULT_BROKER_PORT, help=f"Port of the MQTT broker (default: {DEFAULT_BROKER_PORT})")
     parser.add_argument('--topic', default=DEFAULT_STATUS_TOPIC, help=f"MQTT status topic to subscribe to (default: {DEFAULT_STATUS_TOPIC})")

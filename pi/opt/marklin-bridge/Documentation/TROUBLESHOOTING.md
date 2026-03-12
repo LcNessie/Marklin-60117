@@ -1,11 +1,12 @@
 # Troubleshooting Guide
 
-[<< Home](../README.md) | [Installation Guide](INSTALL.md) | **Troubleshooting** | [Robustness](ROBUSTNESS.md) | [Updating](UPDATING.md) | [Changelog](CHANGELOG.md) | [Code of Conduct](CODE_OF_CONDUCT.md)
+<< Home | Installation Guide | **Troubleshooting** | Status Monitor | Robustness | Updating | Changelog | Code of Conduct
 
 ---
 
 ## Table of Contents
 - [Check Service Status](#check-service-status)
+- [Use the Status Monitor](#use-the-status-monitor)
 - [View the Logs](#view-the-logs)
 - [Test Manually](#test-manually)
 - [Check Dependencies](#check-dependencies)
@@ -24,6 +25,23 @@ sudo systemctl status marklin-bridge.service
 
 *   **Look for `Active: active (running)`:** This means the service is running. If you still have issues, check the logs.
 *   **Look for `Active: failed`:** This means the service tried to start but exited with an error. The status output may include some recent log lines that give a clue.
+
+## Use the Status Monitor
+
+The real-time status monitor (`mbviewer`) is your best tool for spotting issues quickly.
+
+```bash
+bin/mbviewer
+```
+
+The dashboard is divided into three sections to help you isolate the problem:
+
+1.  **Bridge:** Shows application health and total packet traffic.
+2.  **Märklin Side:** Diagnoses the connection to the tracks (WiFi/UDP).
+    *   **UDP Link:** If this is `🔴 DOWN`, the Pi cannot reach the Märklin 60117 box. Check if the box is powered on and connected to the WiFi.
+    *   **Track Power:** `😵 UNKNOWN` means the bridge is confused (usually because the UDP link is down).
+3.  **Network Side:** Diagnoses the connection to your LAN or MQTT Broker.
+    *   **Bridge MQTT Status:** If `🔴 FAILED`, the service cannot connect to your broker.
 
 ## View the Logs
 

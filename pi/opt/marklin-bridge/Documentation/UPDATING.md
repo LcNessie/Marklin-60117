@@ -1,6 +1,6 @@
 # Updating the Application
 
-[<< Home](../README.md) | [Installation Guide](INSTALL.md) | [Troubleshooting](TROUBLESHOOTING.md) | [Robustness](ROBUSTNESS.md) | **Updating** | [Changelog](CHANGELOG.md) | [Code of Conduct](CODE_OF_CONDUCT.md)
+<< Home | Installation Guide | Troubleshooting | Status Monitor | Robustness | **Updating** | Changelog | Code of Conduct
 
 ---
 

@@ -1,5 +1,6 @@
 import socket
 import time
+import signal
 import argparse
 import logging
 import os
@@ -18,6 +19,11 @@ try:
 except ImportError:
     psutil = None # Allow running without psutil for network info
 
+try:
+    import coloredlogs
+except ImportError:
+    coloredlogs = None
+
 class MarklinBridgeApp:
     """Encapsulates the entire Märklin Bridge application."""
 
@@ -28,11 +34,14 @@ class MarklinBridgeApp:
         self.sock = None
         self.network_status_checker = network_utils.NetworkStatus()
 
+        self.running = False
         # State
         self.link_status = constants.STATUS_DOWN
         self.track_power = constants.STATUS_UNKNOWN
         self.packets_from_marklin = 0
         self.packets_to_marklin = 0
+        self.packets_from_mqtt = 0
+        self.packets_to_mqtt = 0
         self.last_source = constants.STATUS_NA
         self.mqtt_status = constants.STATUS_NA # Set by mqtt_handler
         self.interface_status = {}
@@ -43,20 +52,48 @@ class MarklinBridgeApp:
         self.last_iface_check_time = 0
         self.last_status_publish_time = 0.0
 
+    class ColoredFormatter(logging.Formatter):
+        """Custom formatter to add colors to console logs."""
+        grey = "\x1b[38;20m"
+        green = "\x1b[32;20m"
+        yellow = "\x1b[33;20m"
+        red = "\x1b[31;20m"
+        bold_red = "\x1b[31;1m"
+        reset = "\x1b[0m"
+        format_str = "%(asctime)s - %(levelname)s - %(message)s"
+
+        FORMATS = {
+            logging.DEBUG: grey + format_str + reset,
+            logging.INFO: green + format_str + reset,
+            logging.WARNING: yellow + format_str + reset,
+            logging.ERROR: red + format_str + reset,
+            logging.CRITICAL: bold_red + format_str + reset
+        }
+
+        def format(self, record):
+            log_fmt = self.FORMATS.get(record.levelno)
+            if log_fmt is None:
+                log_fmt = self.format_str
+            formatter = logging.Formatter(log_fmt)
+            return formatter.format(record)
+
     def _setup_logging(self):
-        log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        log_fmt = '%(asctime)s - %(levelname)s - %(message)s'
         logger = logging.getLogger()
         logger.setLevel(logging.INFO)
 
         if config.LOG_FILE:
             max_bytes = config.LOG_FILE_MAX_SIZE_MB * 1024 * 1024
             handler = RotatingFileHandler(config.LOG_FILE, maxBytes=max_bytes, backupCount=config.LOG_FILE_BACKUP_COUNT)
-            handler.setFormatter(log_formatter)
+            handler.setFormatter(logging.Formatter(log_fmt))
             logger.addHandler(handler)
         else: # Default to stderr for journald
-            handler = logging.StreamHandler()
-            handler.setFormatter(log_formatter)
-            logger.addHandler(handler)
+            if coloredlogs:
+                coloredlogs.install(level='INFO', fmt=log_fmt)
+            else:
+                handler = logging.StreamHandler()
+                handler.setFormatter(self.ColoredFormatter())
+                logger.addHandler(handler)
 
         logging.info(f"Starting Märklin UDP Bridge. Logging to {'journald/stderr' if not config.LOG_FILE else config.LOG_FILE}.")
 
@@ -84,7 +121,7 @@ class MarklinBridgeApp:
         self.mqtt_status = 'CONNECTING'
 
         try:
-            self.mqtt_client = mqtt.Client(client_id=f"marklin_bridge_{os.getpid()}", userdata=userdata)
+            self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"marklin_bridge_{os.getpid()}", userdata=userdata)
             self.mqtt_client.on_message = mqtt_handler.on_mqtt_message
             self.mqtt_client.on_connect = mqtt_handler.on_mqtt_connect
             self.mqtt_client.on_disconnect = mqtt_handler.on_mqtt_disconnect
@@ -135,7 +172,13 @@ class MarklinBridgeApp:
             "interface_status": self.interface_status,
             "packets_from_marklin": self.packets_from_marklin,
             "packets_to_marklin": self.packets_to_marklin,
-            "last_source": self.last_source
+            "packets_from_mqtt": self.packets_from_mqtt,
+            "packets_to_mqtt": self.packets_to_mqtt,
+            "marklin_ip": config.MARKLIN_IP,
+            "mqtt_broker_ip": config.MQTT_BROKER_IP,
+            "mqtt_status": self.mqtt_status,
+            "marklin_interface": config.MARKLIN_INTERFACE,
+            "home_interface": config.HOME_INTERFACE
         }
 
         try:
@@ -156,6 +199,7 @@ class MarklinBridgeApp:
                 self.track_power = constants.STATUS_UNKNOWN
                 self.set_led_color(led.COLOR_YELLOW_NO_LINK)
                 logging.warning("Link to Märklin interface lost (timeout).")
+                self._publish_status()
 
         should_probe = (self.link_status == constants.STATUS_DOWN) or (time_since_last_packet > constants.QUERY_INTERVAL_S)
         if should_probe and (time.time() - self.last_query_time > constants.QUERY_INTERVAL_S):
@@ -166,12 +210,14 @@ class MarklinBridgeApp:
         if self.link_status != constants.STATUS_UP:
             self.link_status = constants.STATUS_UP
             logging.info("Link to Märklin interface established.")
+            self._publish_status()
 
         self.last_marklin_packet_time = time.time()
         self.packets_from_marklin += 1
 
         if config.MQTT_ENABLED:
             self.mqtt_client.publish(config.MQTT_TOPIC_FROM_MARKLIN, data)
+            self.packets_to_mqtt += 1
         else:
             self.sock.sendto(data, (config.CONTROLLER_IP, config.PORT))
 
@@ -188,6 +234,7 @@ class MarklinBridgeApp:
             if self.track_power != new_power_state and new_power_state != constants.STATUS_UNKNOWN:
                 self.track_power = new_power_state
                 logging.info(f"Track power state changed to: {self.track_power}")
+                self._publish_status()
 
     def _process_packets(self):
         try:
@@ -210,7 +257,8 @@ class MarklinBridgeApp:
 
     def _main_loop(self):
         """The main processing loop."""
-        while True:
+        self.running = True
+        while self.running:
             now = time.time()
 
             # Core logic
@@ -225,6 +273,11 @@ class MarklinBridgeApp:
 
             time.sleep(constants.MAIN_LOOP_DELAY_S)
 
+    def _signal_handler(self, signum, frame):
+        """Handles system signals for graceful shutdown."""
+        logging.info(f"Received signal {signum}. Initiating graceful shutdown...")
+        self.running = False
+
     def cleanup(self):
         if self.mqtt_client:
             logging.info("Disconnecting from MQTT broker.")
@@ -237,6 +290,10 @@ class MarklinBridgeApp:
 
     def run(self):
         """Sets up resources and starts the main application loop."""
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+
         self._setup_logging()
         logging.info("--- Marklin Bridge v%s ---", constants.APP_VERSION)
         try:
@@ -258,8 +315,6 @@ class MarklinBridgeApp:
             self.last_query_time = time.time()
 
             self._main_loop()
-        except KeyboardInterrupt:
-            logging.info("Shutting down...")
         except Exception as e:
             logging.critical("A critical error occurred: %s", e, exc_info=True)
         finally:

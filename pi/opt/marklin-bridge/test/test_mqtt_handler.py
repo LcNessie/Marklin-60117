@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
+import logging
 
 # Local module imports
 import mqtt_handler
@@ -16,6 +17,8 @@ class TestMqttHandler(unittest.TestCase):
 
     def setUp(self):
         """Set up a mock application object for each test."""
+        # Clear any existing handlers on the root logger to prevent test pollution
+        logging.getLogger().handlers = []
         # The handlers receive the main app instance via the `userdata` dict.
         # We create a mock `app` that has all the attributes the handlers expect.
         self.mock_app = MagicMock()
@@ -23,6 +26,7 @@ class TestMqttHandler(unittest.TestCase):
         self.mock_app.is_interactive = False # Test the service-mode logging path
         # Initialize the counter as a real integer so `+=` works as expected.
         self.mock_app.packets_to_marklin = 0
+        self.mock_app.packets_from_mqtt = 0
 
         # We also need a mock for the MQTT message object.
         self.mock_msg = MagicMock()
@@ -38,6 +42,7 @@ class TestMqttHandler(unittest.TestCase):
     def tearDown(self):
         """Clean up patches after each test."""
         self.config_patcher.stop()
+        logging.getLogger().handlers = []
 
     def test_on_mqtt_message_success(self):
         """Tests that a received MQTT message is correctly forwarded via UDP."""
@@ -54,6 +59,9 @@ class TestMqttHandler(unittest.TestCase):
         # 2. The application's packet counter and last source should be updated.
         self.assertEqual(self.mock_app.packets_to_marklin, 1)
         self.assertEqual(self.mock_app.last_source, 'MQTT:marklin/to_interface')
+
+        # 3. The MQTT packet counter should be updated.
+        self.assertEqual(self.mock_app.packets_from_mqtt, 1)
 
     def test_on_mqtt_message_socket_error(self):
         """Tests that an exception during socket.sendto is handled gracefully."""
@@ -73,21 +81,30 @@ class TestMqttHandler(unittest.TestCase):
         # The packet counter should NOT be incremented on failure.
         self.assertEqual(self.mock_app.packets_to_marklin, 0)
 
+        # However, we DID receive the message from MQTT, so this should increment.
+        self.assertEqual(self.mock_app.packets_from_mqtt, 1)
+
     def test_on_mqtt_connect_success(self):
         """Tests the callback for a successful MQTT connection."""
         # --- Act ---
         # A result code (rc) of 0 means success.
-        mqtt_handler.on_mqtt_connect(None, {'app': self.mock_app}, None, 0)
+        # Use assertLogs to capture the INFO log message
+        with self.assertLogs('root', level='INFO') as cm:
+            # Paho v2 signature: client, userdata, flags, reason_code, properties
+            mqtt_handler.on_mqtt_connect(None, {'app': self.mock_app}, None, 0, None)
+            self.assertIn("Successfully connected to MQTT broker", cm.output[0])
 
         # --- Assert ---
         self.assertEqual(self.mock_app.mqtt_status, "CONNECTED")
+        self.mock_app._publish_status.assert_called_once()
 
     def test_on_mqtt_connect_failure(self):
         """Tests the callback for a failed MQTT connection."""
         # --- Act & Assert ---
         # A non-zero result code means failure (e.g., 5 = Not authorized).
         with self.assertLogs('root', level='ERROR') as cm:
-            mqtt_handler.on_mqtt_connect(None, {'app': self.mock_app}, None, 5)
+            # Paho v2 signature: client, userdata, flags, reason_code, properties
+            mqtt_handler.on_mqtt_connect(None, {'app': self.mock_app}, None, 5, None)
             self.assertIn("Failed to connect to MQTT broker", cm.output[0])
 
         # --- Assert ---
@@ -97,8 +114,9 @@ class TestMqttHandler(unittest.TestCase):
         """Tests the callback for a disconnection event."""
         # --- Act & Assert ---
         # A non-zero result code (rc) means an unexpected disconnect.
+        # Paho v2 signature: client, userdata, disconnect_flags, reason_code, properties
         with self.assertLogs('root', level='WARNING') as cm:
-            mqtt_handler.on_mqtt_disconnect(None, {'app': self.mock_app}, 1)
+            mqtt_handler.on_mqtt_disconnect(None, {'app': self.mock_app}, None, 1, None)
             self.assertIn("Unexpectedly disconnected from MQTT broker", cm.output[0])
 
         # --- Assert ---
