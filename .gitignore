@@ -31,3 +31,6 @@ Thumbs.db
 
 # Log files
 *.log
+
+# Configuration
+config.ini
