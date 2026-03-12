@@ -48,6 +48,8 @@ By default, the viewer tries to connect to an MQTT broker on `127.0.0.1` (localh
 | `--username` | *None* | Username for MQTT authentication. |
 | `--password` | *None* | Password for MQTT authentication. |
 
+> **Note:** The viewer does not read `config.ini`. If you have customized the MQTT broker or topic in the bridge configuration, you must provide those same details here using arguments.
+
 **Example:** Connecting to a remote broker:
 
 ```bash
