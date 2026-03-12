@@ -1,0 +1,9 @@
+# This file lists the Python dependencies for the project.
+# All are optional depending on the desired features.
+#
+# Versions are "pinned" to ensure reproducible builds. To generate this file
+# on a development machine with the packages installed, you can run:
+# pip freeze > requirements.txt
+# pigpio==1.78          # For status LED on Raspberry Pi
+paho-mqtt==1.6.1      # For MQTT Gateway mode
+psutil==5.9.5         # For network interface status in interactive mode

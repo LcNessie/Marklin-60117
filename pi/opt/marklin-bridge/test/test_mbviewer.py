@@ -1,0 +1,103 @@
+import sys
+import unittest
+from unittest.mock import Mock, patch
+
+# Mock the curses module at a high level to ensure tests can be discovered.
+sys.modules['curses'] = Mock()
+
+import mbviewer
+
+class TestMqttCallbacks(unittest.TestCase):
+
+    def test_on_connect(self):
+        """Test the on_connect MQTT callback."""
+        userdata = {'connection_status': '', 'topic': 'test/topic'}
+        mock_client = Mock()
+        
+        mbviewer.on_connect(mock_client, userdata, None, 0)
+        self.assertEqual(userdata['connection_status'], "CONNECTED")
+        mock_client.subscribe.assert_called_with('test/topic')
+
+        mock_client.reset_mock()
+        
+        mbviewer.on_connect(mock_client, userdata, None, 1)
+        self.assertEqual(userdata['connection_status'], "FAILED (1)")
+        mock_client.subscribe.assert_not_called()
+
+    def test_on_disconnect(self):
+        """Test the on_disconnect MQTT callback."""
+        userdata = {'connection_status': 'CONNECTED'}
+        mbviewer.on_disconnect(None, userdata, 0)
+        self.assertEqual(userdata['connection_status'], "DISCONNECTED")
+
+    def test_on_message(self):
+        """Test the on_message MQTT callback."""
+        userdata = {'status_data': None}
+        mock_msg = Mock()
+        
+        mock_msg.payload = b'{"version": "1.0"}'
+        mbviewer.on_message(None, userdata, mock_msg)
+        self.assertEqual(userdata['status_data'], {"version": "1.0"})
+
+        mock_msg.payload = b'{"version": "1.0"'
+        mbviewer.on_message(None, userdata, mock_msg)
+        self.assertEqual(userdata['status_data'], {"error": "Invalid JSON received"})
+
+class TestCursesUI(unittest.TestCase):
+
+    def setUp(self):
+        """Set up a patch for the curses module before each test."""
+        self.patcher = patch('mbviewer.curses')
+        self.mock_curses = self.patcher.start()
+        self.addCleanup(self.patcher.stop)
+
+        self.mock_stdscr = Mock()
+        
+        self.mock_curses.has_colors.return_value = True
+        self.mock_curses.color_pair.side_effect = lambda x: f'color_{x}'
+        self.mock_curses.A_NORMAL = 'A_NORMAL'
+        self.mock_curses.error = type('curses_error', (Exception,), {})
+        
+        self.ui = mbviewer.CursesUI(self.mock_stdscr)
+
+    def test_init_with_colors(self):
+        """Test UI initialization when colors are supported."""
+        self.mock_curses.start_color.assert_called_once()
+        self.assertEqual(self.ui.COLOR_PAIR_GREEN, 'color_1')
+
+    def test_init_without_colors(self):
+        """Test UI initialization when colors are not supported."""
+        self.mock_curses.has_colors.return_value = False
+        ui_no_color = mbviewer.CursesUI(self.mock_stdscr)
+        self.assertEqual(ui_no_color.COLOR_PAIR_GREEN, 'A_NORMAL')
+        self.mock_curses.start_color.assert_called_once()
+
+    def test_draw_waiting_for_message(self):
+        """Test drawing when waiting for the first message."""
+        self.ui.draw(None, "CONNECTING")
+        # Line number trace: 2 (title) + 1 (blank) + 1 (status) + 1 (blank) = 5
+        self.mock_stdscr.addstr.assert_any_call(5, 0, "Waiting for first status message...", self.ui.COLOR_PAIR_YELLOW)
+
+    def test_draw_with_status_data(self):
+        """Test drawing with a full set of status data."""
+        status_data = {
+            'version': '1.2.3', 'link_status': 'UP', 'track_power': 'GO',
+            'interface_status': {'eth0': 'UP', 'wlan0': 'DOWN'},
+            'packets_from_marklin': 123, 'packets_to_marklin': 456, 'last_source': '192.168.1.10'
+        }
+        self.ui.draw(status_data, "CONNECTED")
+        # Line number trace: 5 (from above) + 1 (title) + 1 = 7
+        self.mock_stdscr.addstr.assert_any_call(6, 20, "1.2.3", self.ui.COLOR_PAIR_DEFAULT)
+        self.mock_stdscr.addstr.assert_any_call(8, 20, "🟢 GO", self.ui.COLOR_PAIR_GREEN)
+        self.mock_stdscr.addstr.assert_any_call(12, 20, "🔴 DOWN", self.ui.COLOR_PAIR_RED)
+
+    def test_draw_ignores_curses_error(self):
+        """Test that draw method handles curses errors gracefully."""
+        self.mock_stdscr.erase.side_effect = self.mock_curses.error
+        try:
+            self.ui.draw({}, "CONNECTED")
+        except self.mock_curses.error:
+            self.fail("Curses error was not handled gracefully (it was re-raised).")
+
+if __name__ == '__main__':
+    unittest.main()

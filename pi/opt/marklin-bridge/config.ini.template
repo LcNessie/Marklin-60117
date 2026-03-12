@@ -1,0 +1,39 @@
+#
+# Configuration for the Märklin UDP Bridge
+#
+# To use, copy this file to 'config.ini' and edit the values below.
+#
+
+[Network]
+# The IP address of your control computer (e.g., running Rocrail, iTrain, etc.)
+ControllerIP = 192.168.1.100
+
+# The IP address of your Märklin network interface (e.g., 60117)
+MarklinIP = 192.168.160.1
+
+# The UDP port used for Märklin communication (default is 15731)
+Port = 15731
+
+[GPIO]
+# Set to 'true' to enable the status LED, or 'false' to disable it.
+Enabled = true
+
+# BCM pin numbers for the RGB LED
+RedPin = 16
+GreenPin = 20
+BluePin = 21
+
+[MQTT]
+# Set to 'true' to enable MQTT Gateway mode. This disables the direct UDP bridge.
+Enabled = false
+# IP address or hostname of the MQTT broker (e.g., Mosquitto)
+BrokerIP = 127.0.0.1
+BrokerPort = 1883
+# Optional: Uncomment and set if your broker requires authentication.
+# Leave blank or commented out for anonymous access.
+# Username =
+# Password =
+# Topic to publish messages from the Märklin interface TO
+TopicFromMarklin = marklin/from_interface
+# Topic to subscribe to for messages going TO the Märklin interface
+TopicToMarklin = marklin/to_interface

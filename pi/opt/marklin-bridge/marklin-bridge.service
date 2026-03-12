@@ -1,0 +1,21 @@
+[Unit]
+Description=Märklin UDP Bridge Service
+After=network.target pigpiod.service
+# BindsTo is stronger than Requires. If pigpiod is stopped, this service will also be stopped.
+BindsTo=pigpiod.service
+
+[Service]
+Type=simple
+User=marklin-bridge
+WorkingDirectory=/opt/marklin-bridge
+ExecStart=/opt/marklin-bridge/venv/bin/python3 /opt/marklin-bridge/marklin_bridge.py
+Restart=on-failure
+RestartSec=5
+
+# Security Hardening: Restrict the service's access to the filesystem.
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
