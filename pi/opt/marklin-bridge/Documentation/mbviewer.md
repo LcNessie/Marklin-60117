@@ -82,7 +82,7 @@ Monitors the connection between the Raspberry Pi and the Märklin 60117/60113 Bo
 ### 3. Network Side
 Monitors the connection between the Raspberry Pi and your home network/MQTT broker.
 
-*   **Interface:** The network interface used (e.g., `eth0`).
+*   **Interface:** The network interface used (e.g., `eth0`) and its status.
 *   **Bridge Home IP:** The IP address of the Pi on your home LAN.
 *   **MQTT Broker IP:** The configured broker address.
 *   **Bridge MQTT Status:**
