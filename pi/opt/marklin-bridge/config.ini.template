@@ -6,34 +6,62 @@
 
 [Network]
 # The IP address of your control computer (e.g., running Rocrail, iTrain, etc.)
-ControllerIP = 192.168.1.100
+# Default: 192.168.1.100
+#ControllerIP = 192.168.1.100
 
 # The IP address of your Märklin network interface (e.g., 60117)
-MarklinIP = 192.168.160.1
+# Default: 192.168.160.1
+#MarklinIP = 192.168.160.1
 
-# The UDP port used for Märklin communication (default is 15731)
-Port = 15731
+# The UDP port used for Märklin communication.
+# Default: 15731
+#Port = 15731
 
 [GPIO]
 # Set to 'true' to enable the status LED, or 'false' to disable it.
-Enabled = true
+# Default: true
+#Enabled = true
 
 # BCM pin numbers for the RGB LED
-RedPin = 16
-GreenPin = 20
-BluePin = 21
+# Default: 16, 20, 21
+#RedPin = 16
+#GreenPin = 20
+#BluePin = 21
 
 [MQTT]
 # Set to 'true' to enable MQTT Gateway mode. This disables the direct UDP bridge.
-Enabled = false
+# Default: false
+#Enabled = false
+
 # IP address or hostname of the MQTT broker (e.g., Mosquitto)
-BrokerIP = 127.0.0.1
-BrokerPort = 1883
+# Default: 127.0.0.1
+#BrokerIP = 127.0.0.1
+#BrokerPort = 1883
+
 # Optional: Uncomment and set if your broker requires authentication.
 # Leave blank or commented out for anonymous access.
-# Username =
-# Password =
+#Username =
+#Password =
 # Topic to publish messages from the Märklin interface TO
-TopicFromMarklin = marklin/from_interface
+# Default: marklin/from_interface
+#TopicFromMarklin = marklin/from_interface
 # Topic to subscribe to for messages going TO the Märklin interface
-TopicToMarklin = marklin/to_interface
+# Default: marklin/to_interface
+#TopicToMarklin = marklin/to_interface
+# Topic to publish periodic status updates to
+# Default: marklin/status
+#StatusTopic = marklin/status
+# Interval in seconds to publish status updates
+# Default: 5.0
+#StatusIntervalS = 5.0
+
+[Logging]
+# File path for the log file. Leave blank to log to standard output.
+# Default: (empty)
+#LogFile = 
+# Maximum size of the log file before it rotates (in MB).
+# Default: 5
+#LogFileMaxSizeMB = 5
+# Number of backup log files to keep.
+# Default: 3
+#LogFileBackupCount = 3
