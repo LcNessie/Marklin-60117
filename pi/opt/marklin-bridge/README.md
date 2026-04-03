@@ -10,7 +10,7 @@ A Python-based application for Märklin CAN-over-UDP traffic, designed to run on
 - [License](#license)
 - [Installation and Setup Guide](Documentation/INSTALL.md)
 - [Troubleshooting Guide](Documentation/TROUBLESHOOTING.md)
-- [Status Monitor Guide](Documentation/mbviewer.md)
+- [Status Monitor Guide](Documentation/MBVIEWER.md)
 - [Updating the Application](Documentation/UPDATING.md)
 - [Changelog](Documentation/CHANGELOG.md)
 - [Code of Conduct](Documentation/CODE_OF_CONDUCT.md)

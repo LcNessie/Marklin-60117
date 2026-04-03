@@ -1,6 +1,6 @@
 # Installation and Setup Guide
 
-<< Home | **Installation Guide** | Troubleshooting | Status Monitor | Robustness | Updating | Changelog | Code of Conduct
+<< [Home](../README.md) | **Installation Guide** | [Troubleshooting](TROUBLESHOOTING.md) | [Status Monitor](MBVIEWER.md) | [Robustness](ROBUSTNESS.md) | [Updating](UPDATING.md) | [Changelog](CHANGELOG.md) | [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ---
 

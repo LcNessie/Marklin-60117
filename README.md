@@ -12,4 +12,4 @@ The primary intention of this project is to bridge that fixed 60117 access point
 
 The main source code, documentation, and configuration for this project are located in the `pi/opt/marklin-bridge/` directory.
 
-👉 **Click here to go to the Main README** for comprehensive details, installation instructions, and usage guides.
+👉 [**Click here to go to the Main README**](pi/opt/marklin-bridge/README.md) for comprehensive details, installation instructions, and usage guides.
