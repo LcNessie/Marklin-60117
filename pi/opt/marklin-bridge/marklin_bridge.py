@@ -105,33 +105,12 @@ class MarklinBridgeApp:
         self.status_led = led.create_led_instance(config.config)
 
     def _setup_network(self):
-        # New logic: Try to find the IP of the Märklin interface to bind to it specifically.
-        # This improves behavior on multi-homed systems (e.g., Pi with WiFi and Ethernet)
-        # by ensuring query packets are sent from the correct source IP/interface.
-        marklin_iface_ip = None
-        if config.MARKLIN_INTERFACE and config.MARKLIN_INTERFACE != constants.STATUS_NA:
-            # We need psutil to find the IP.
-            if self.network_status_checker.psutil_available:
-                ip, _, _ = self.network_status_checker.get_interface_info(config.MARKLIN_INTERFACE)
-                if ip and ip != constants.STATUS_NA:
-                    marklin_iface_ip = ip
-            else:
-                logging.warning(f"Cannot determine IP for interface '{config.MARKLIN_INTERFACE}' because psutil is not installed. Will bind to all interfaces (0.0.0.0).")
-
-        # Bind to the specific interface IP if found, otherwise fall back to 0.0.0.0
-        bind_ip = marklin_iface_ip if marklin_iface_ip else "0.0.0.0"
-        logging.info(f"Binding UDP socket to {bind_ip}:{config.PORT}")
+        # Bind to '0.0.0.0' to receive packets on all interfaces, which is crucial
+        # for capturing UDP broadcasts from the Märklin box. Attempting to bind
+        # to a specific IP can prevent broadcast packets from being received.
+        logging.info(f"Binding UDP socket to 0.0.0.0:%s", config.PORT)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            self.sock.bind((bind_ip, config.PORT))
-        except OSError as e:
-            logging.error(f"Failed to bind to {bind_ip}:{config.PORT}: {e}. This can happen if the interface is not up.")
-            if bind_ip != "0.0.0.0":
-                logging.warning("Falling back to binding on all interfaces (0.0.0.0).")
-                self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Re-create socket
-                self.sock.bind(("0.0.0.0", config.PORT))
-            else:
-                raise # Re-raise if binding to 0.0.0.0 fails
+        self.sock.bind(("0.0.0.0", config.PORT))
         self.sock.setblocking(False)
 
     def _setup_mqtt(self):
@@ -280,18 +259,23 @@ class MarklinBridgeApp:
             source_ip = addr[0]
             self.last_source = source_ip
 
-            if not config.MQTT_ENABLED and source_ip == config.CONTROLLER_IP:
+            # If the packet is from the Märklin box, handle it internally.
+            # This logic is the same for both Bridge and MQTT Gateway modes.
+            if source_ip == config.MARKLIN_IP:
+                self._handle_marklin_packet(data)
+
+            # If the packet is from any other source (a controller),
+            # forward it to the Märklin box, but ONLY in UDP Bridge mode.
+            elif not config.MQTT_ENABLED:
                 self.sock.sendto(data, (config.MARKLIN_IP, config.PORT))
                 self.packets_to_marklin += 1
-            elif source_ip == config.MARKLIN_IP:
-                self._handle_marklin_packet(data)
 
         except BlockingIOError:
             pass # Normal, no data received
         except Exception as e:
-            logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+            logging.error(f"An unexpected error occurred in packet processing: {e}", exc_info=True)
             self.last_source = f"ERROR: {e}"
-            time.sleep(1)
+            time.sleep(1) # Prevent spamming logs on repeated errors
 
     def _main_loop(self):
         """The main processing loop."""

@@ -42,7 +42,14 @@ The dashboard is divided into three sections to help you isolate the problem:
     - **UDP Link:** If this is `🔴 DOWN`, the Pi cannot reach the Märklin 60117 box. Check if the box is powered on and connected to the WiFi.
     - **Track Power:** `😵 UNKNOWN` means the bridge is confused (usually because the UDP link is down).
 3. **Network Side:** Diagnoses the connection to your LAN or MQTT Broker.
-    - **Bridge MQTT Status:** If `🔴 FAILED`, the service cannot connect to your broker.
+
+### UDP Link is DOWN on a Multi-Homed System (e.g., WiFi and Ethernet)
+
+If your Raspberry Pi is connected to two networks, the operating system might try to send packets to the Märklin box through the wrong interface (e.g., sending out the Ethernet port instead of the WiFi). This will cause the UDP link to fail.
+
+The most reliable solution is to ensure only the `wlan0` interface is connected to the Märklin network and that any other network connections (like `eth0`) are either disconnected or configured at the OS level with static routes to not interfere.
+
+- **Bridge MQTT Status:** If `🔴 FAILED`, the service cannot connect to your broker.
 
 ### Track Power is `UNKNOWN` but UDP Link is `UP`
 
