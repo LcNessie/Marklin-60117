@@ -29,7 +29,7 @@ A Python-based application for Märklin CAN-over-UDP traffic, designed to run on
 * **Active Link Probing:** When the link to the Märklin interface goes down, the script actively sends "ping" packets to re-establish the connection and status as quickly as possible.
 * **Optional GPIO:** The status LED functionality can be completely disabled in the configuration, allowing the script to run on hardware without GPIO access.
 * **Headless Operation:** Designed to run as a `systemd` service for reliable, headless operation.
-* **Robust GPIO Control:** Uses the `pigpio` daemon for stable and performant control of the GPIO pins.
+* **Modern GPIO Control:** Uses the standard `libgpiod` library to control the status LED, ensuring compatibility with modern Raspberry Pi OS versions.
 
 ## Requirements
 
@@ -44,7 +44,7 @@ A Python-based application for Märklin CAN-over-UDP traffic, designed to run on
 
 * Python 3
 * A Debian-based OS like Raspberry Pi OS.
-* The `pigpiod` daemon must be installed and running if you enable the GPIO status LED feature in the configuration.
+* The `libgpiod` library and its Python bindings, which are standard on recent Raspberry Pi OS versions.
 * The Python libraries listed in `requirements.txt`, which support the application's optional features (LED status, MQTT mode, etc.).
 
 ## Getting Started

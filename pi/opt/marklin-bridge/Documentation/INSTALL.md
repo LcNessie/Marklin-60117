@@ -5,6 +5,7 @@
 ---
 
 ## Table of Contents
+
 - [Installation Steps](#installation-steps)
 - [Configuration Details](#configuration-details)
 - [Running as a Systemd Service](#running-as-a-systemd-service)
@@ -32,6 +33,7 @@ This guide provides detailed instructions for installing the Märklin UDP Bridge
     sudo cp /opt/marklin-bridge/config.ini.template /opt/marklin-bridge/config.ini
     sudo -u marklin-bridge nano /opt/marklin-bridge/config.ini
     ```
+
     Be sure to configure your network IPs and choose your operating mode (UDP Bridge or MQTT Gateway).
 
 4. **Set Permissions:**
@@ -56,40 +58,32 @@ This guide provides detailed instructions for installing the Märklin UDP Bridge
     # Use the pip from the virtual environment. No sudo is needed.
     sudo -u marklin-bridge /opt/marklin-bridge/venv/bin/pip3 install -r /opt/marklin-bridge/requirements.txt
     ```
-
-7. **Install and Enable the pigpio Daemon (Optional):**
-    This step is only required if you plan to use the status LED (`Enabled = true` in the `[GPIO]` section of `config.ini`). The `pigpio` package provides the system daemon needed to control the GPIO pins.
-
-    ```bash
-    # Install the pigpio package, which includes the daemon and command-line tools
-    sudo apt-get update
-    sudo apt-get install pigpio
-
-    # Enable the daemon to start on boot and start it now
-    sudo systemctl enable pigpiod
-    sudo systemctl start pigpiod
-    ```
+    
+7. **Verify GPIO Access (Optional):**
+    This application uses the `libgpiod` library for LED control, which is included in modern Raspberry Pi OS. The `pip install` command in the previous step will have installed the necessary Python bindings. No further action is typically required.
 
 ## Configuration Details
 
 The `config.ini` file allows you to customize the bridge's behavior.
 
-*   **[Network]**: Configure IP addresses for your controller and the Märklin interface.
-*   **[GPIO]**: Enable/disable the status LED and specify the GPIO pins.
-*   **Note on Constants**: Fundamental protocol constants (e.g., CAN frame details) are defined in `constants.py` and are not intended for user configuration.
-*   **[MQTT]**: Enable MQTT Gateway mode and configure broker details and topics.
-*   **[Logging]**: (Service Mode Only)
-    *   **Default (Recommended):** By default, `LogFile` is empty, and all logs are sent to the `systemd` journal. You can view them with `journalctl -u marklin-bridge.service`. This is the best option for most users.
-    *   **Alternative (File Logging):** If you prefer a dedicated log file, you can set the `LogFile` path. This is useful if you are not using `systemd` or want a separate, self-managed log.
-        *   `LogFile`: Path to a dedicated log file (e.g., `/opt/marklin-bridge/marklin_bridge.log`).
-        *   `LogFileMaxSizeMB`: The maximum size in megabytes before the log file is rotated.
-        *   `LogFileBackupCount`: The number of old log files to keep.
+- **[Network]**: Configure IP addresses for your controller and the Märklin interface.
+- **[GPIO]**: Enable/disable the status LED and specify the GPIO pins.
+- **Note on Constants**: Fundamental protocol constants (e.g., CAN frame details) are defined in `constants.py` and are not intended for user configuration.
+- **[MQTT]**: Enable MQTT Gateway mode and configure broker details and topics.
+- **[Logging]**: (Service Mode Only)
+  - **Default (Recommended):** By default, `LogFile` is empty, and all logs are sent to the `systemd` journal. You can view them with `journalctl -u marklin-bridge.service`. This is the best option for most users.
+  - **Alternative (File Logging):** If you prefer a dedicated log file, you can set the `LogFile` path. This is useful if you are not using `systemd` or want a separate, self-managed log.
+  - `LogFile`: Path to a dedicated log file (e.g., `/opt/marklin-bridge/marklin_bridge.log`).
+  - `LogFileMaxSizeMB`: The maximum size in megabytes before the log file is rotated.
+  - `LogFileBackupCount`: The number of old log files to keep.
 
 Example `[Logging]` section for a dedicated log file:
+
 ```ini
 [Logging]
 LogFile = /opt/marklin-bridge/marklin_bridge.log
 ```
+
 ## Running as a Systemd Service
 
 To have the bridge start automatically on boot, you can use the provided `systemd` service file.

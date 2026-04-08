@@ -98,14 +98,11 @@ class MarklinBridgeApp:
         logging.info(f"Starting Märklin UDP Bridge. Logging to {'journald/stderr' if not config.LOG_FILE else config.LOG_FILE}.")
 
     def _setup_gpio(self):
-        if config.GPIO_ENABLED:
-            try:
-                self.status_led = led.StatusLED(config.LED_RED_PIN, config.LED_GREEN_PIN, config.LED_BLUE_PIN)
-                logging.info("GPIO Initialized for LED.")
-            except (ImportError, ConnectionError, Exception) as e:
-                message = f"Warning: GPIO setup failed: {e}. LED will be disabled."
-                logging.warning(message)
-                self.status_led = None
+        """
+        Initializes the status LED using the factory function in the led module.
+        The factory handles all backend selection and error handling.
+        """
+        self.status_led = led.create_led_instance(config.config)
 
     def _setup_network(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

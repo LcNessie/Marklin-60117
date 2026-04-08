@@ -31,7 +31,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
 
         # Mock the resources that are created during the app's setup phase
         self.app.sock = MagicMock(spec=socket.socket)
-        self.app.status_led = MagicMock(spec=led.StatusLED)
+        self.app.status_led = MagicMock(spec=led.AbstractLED)
         self.app.mqtt_client = MagicMock()
 
         # Mock time to control time-based logic (e.g., timeouts)

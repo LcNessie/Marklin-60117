@@ -11,9 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-03-12
+## [1.0.0] - (Unreleased)
+
+### Changed
+
+- Refactored GPIO control to exclusively use `libgpiod` for simplicity and to remove the `pigpio` dependency. LED control is now simple on/off, not PWM.
 
 ### Added
+
 - Initial project structure.
 - Core UDP Bridge and MQTT Gateway functionality.
 - Status LED support via `pigpio`.

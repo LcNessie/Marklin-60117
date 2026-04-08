@@ -5,6 +5,7 @@
 ---
 
 ## Table of Contents
+
 - [Check Service Status](#check-service-status)
 - [Use the Status Monitor](#use-the-status-monitor)
 - [View the Logs](#view-the-logs)
@@ -23,8 +24,8 @@ This is the first command you should run. It provides a summary of the service's
 sudo systemctl status marklin-bridge.service
 ```
 
-*   **Look for `Active: active (running)`:** This means the service is running. If you still have issues, check the logs.
-*   **Look for `Active: failed`:** This means the service tried to start but exited with an error. The status output may include some recent log lines that give a clue.
+- **Look for `Active: active (running)`:** This means the service is running. If you still have issues, check the logs.
+- **Look for `Active: failed`:** This means the service tried to start but exited with an error. The status output may include some recent log lines that give a clue.
 
 ## Use the Status Monitor
 
@@ -36,12 +37,12 @@ bin/mbviewer
 
 The dashboard is divided into three sections to help you isolate the problem:
 
-1.  **Bridge:** Shows application health and total packet traffic.
-2.  **Märklin Side:** Diagnoses the connection to the tracks (WiFi/UDP).
-    *   **UDP Link:** If this is `🔴 DOWN`, the Pi cannot reach the Märklin 60117 box. Check if the box is powered on and connected to the WiFi.
-    *   **Track Power:** `😵 UNKNOWN` means the bridge is confused (usually because the UDP link is down).
-3.  **Network Side:** Diagnoses the connection to your LAN or MQTT Broker.
-    *   **Bridge MQTT Status:** If `🔴 FAILED`, the service cannot connect to your broker.
+1. **Bridge:** Shows application health and total packet traffic.
+2. **Märklin Side:** Diagnoses the connection to the tracks (WiFi/UDP).
+    - **UDP Link:** If this is `🔴 DOWN`, the Pi cannot reach the Märklin 60117 box. Check if the box is powered on and connected to the WiFi.
+    - **Track Power:** `😵 UNKNOWN` means the bridge is confused (usually because the UDP link is down).
+3. **Network Side:** Diagnoses the connection to your LAN or MQTT Broker.
+    - **Bridge MQTT Status:** If `🔴 FAILED`, the service cannot connect to your broker.
 
 ## View the Logs
 
@@ -70,4 +71,4 @@ This will show any startup errors (like problems with `config.ini` or network so
 
 ## Check Dependencies
 
-The service depends on the network and the `pigpio` daemon. Ensure `systemctl status pigpiod.service` shows it is `active (running)` and that you can `ping` the Märklin interface IP address from your `config.ini`.
+The service depends on the network. Ensure that you can `ping` the Märklin interface IP address from your `config.ini`. If using the status LED, ensure the `marklin-bridge` user has GPIO access. If the logs show errors related to `gpiod` or `/dev/gpiochip0`, there may be a permissions issue or the library may not be installed correctly.

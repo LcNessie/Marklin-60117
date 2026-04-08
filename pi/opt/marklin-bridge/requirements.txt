@@ -4,7 +4,7 @@
 # Versions are "pinned" to ensure reproducible builds. To generate this file
 # on a development machine with the packages installed, you can run:
 # pip freeze > requirements.txt
-pigpio==1.78; sys_platform == 'linux'  # For status LED on Raspberry Pi. (Skipped on Windows)
+gpiod>=2.0.0; sys_platform == 'linux'  # For status LED on Raspberry Pi. (Skipped on Windows)
 paho-mqtt>=2.0.0      # Updated to 2.x. Requires CallbackAPIVersion.VERSION2 in code.
 psutil>=6.0.0         # Minimum 6.0.0. Unpinned to allow latest stable version for 2026.
 windows-curses; sys_platform == 'win32' # Required for mbviewer.py on Windows.
