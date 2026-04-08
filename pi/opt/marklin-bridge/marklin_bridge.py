@@ -79,8 +79,8 @@ class MarklinBridgeApp:
 
     def _setup_logging(self):
         log_fmt = '%(asctime)s - %(levelname)s - %(message)s'
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
+        logger = logging.getLogger() # Get the root logger
+        logger.setLevel(logging.DEBUG) # Set to DEBUG for detailed troubleshooting
 
         if config.LOG_FILE:
             max_bytes = config.LOG_FILE_MAX_SIZE_MB * 1024 * 1024
@@ -234,6 +234,10 @@ class MarklinBridgeApp:
             # Case 2: System Halt command (subcommand 0x01), also means STOP
             elif subcommand == constants.SYSTEM_HALT_SUBCMD:
                 new_power_state = "STOP"
+
+            # Log the parsed system command details for debugging
+            status_val = data[constants.GO_STOP_STATUS_INDEX] if subcommand == constants.GO_STOP_SUBCMD and len(data) > constants.GO_STOP_STATUS_INDEX else 'N/A'
+            logging.debug(f"System command received: subcommand={hex(subcommand)}, status={hex(status_val) if status_val != 'N/A' else status_val}, derived_power_state={new_power_state}, raw_packet={data.hex()}")
 
             # If a valid power state was detected and it's a change, update the system state
             if new_power_state and self.track_power != new_power_state:

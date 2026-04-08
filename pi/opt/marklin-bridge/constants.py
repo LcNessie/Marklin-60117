@@ -1,36 +1,53 @@
-# This file contains hardcoded constants for the application.
-# These are fundamental to the protocol and are not intended for user configuration.
+# constants.py
 
-# --- Märklin Protocol Constants ---
-FRAME_MIN_LENGTH = 13         # A full CAN-over-UDP frame is 13 bytes
-SYSTEM_CMD_CAN_ID = b'\x00\x00\x00\x00' # CAN-ID for a system command (Go, Stop, etc.)
-GO_STOP_SUBCMD_INDEX = 5      # The sub-command for Go/Stop is the 1st data byte
-GO_STOP_SUBCMD = 0x00
-GO_STOP_STATUS_INDEX = 8      # The actual status (0 or 1) is the 4th data byte
-SYSTEM_GO = 0x01
-SYSTEM_STOP = 0x00
+# Application Version
+APP_VERSION = "1.0.0" # Placeholder, should be updated with actual version
 
-# --- Connectivity Constants ---
-CONNECTION_TIMEOUT_S = 10  # Seconds before assuming connection is lost
-QUERY_INTERVAL_S = 5       # Seconds between sending a query when link is down
-MQTT_KEEPALIVE_S = 60      # Seconds for MQTT keepalive
-# This is a CAN "ping" packet from a generic client (UID 0x00)
-QUERY_PACKET = b'\x00\x30\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+# Network Configuration
+PORT = 15731  # Default UDP port for Märklin CAN-over-UDP
+UDP_BUFFER_SIZE = 1024 # Max UDP packet size
 
-# --- Network & Timing Constants ---
-UDP_BUFFER_SIZE = 1024
-MAIN_LOOP_DELAY_S = 0.02
-IFACE_CHECK_INTERVAL_S = 5
-SOCKET_TIMEOUT_S = 1.0
-PROBE_PORT = 80
+# Connection Health
+CONNECTION_TIMEOUT_S = 10 # Seconds without a packet before link is considered DOWN
+QUERY_INTERVAL_S = 5    # Seconds between sending query packets when link is DOWN or no recent activity
+MAIN_LOOP_DELAY_S = 0.02 # Delay in main loop to prevent 100% CPU usage
 
-# --- Status Strings ---
+# Network Interface Checking
+IFACE_CHECK_INTERVAL_S = 5 # Seconds between checking network interface status
+
+# MQTT Configuration
+MQTT_KEEPALIVE_S = 60 # MQTT keepalive interval in seconds
+
+# Status Strings
 STATUS_UP = "UP"
 STATUS_DOWN = "DOWN"
 STATUS_UNKNOWN = "UNKNOWN"
-STATUS_NA = "N/A"
-STATUS_NO_PSUTIL = "NO_PSUTIL"
-STATUS_HOST_NOT_FOUND = "HOST NOT FOUND"
+STATUS_NA = "N/A" # Not Applicable
 
-# --- Application Info ---
-APP_VERSION = "1.0.0"
+# Märklin CAN Protocol Constants (based on known protocol details)
+# These are byte sequences or integer values derived from the Märklin CAN protocol.
+
+# CAN ID for System Commands (e.g., Go/Stop, Halt)
+SYSTEM_CMD_CAN_ID = b'\x00\x00\x00\x00'
+
+# Minimum length of a valid CAN frame (header + data)
+FRAME_MIN_LENGTH = 13 # 4 bytes CAN ID + 1 byte DLC + 8 bytes data
+
+# Index of the subcommand byte within the data payload for system commands
+GO_STOP_SUBCMD_INDEX = 5 # For CAN ID 0x00000000, data[5] is the subcommand
+
+# Subcommand for normal Go/Stop messages (data[5] = 0x00)
+GO_STOP_SUBCMD = 0x00
+
+# Subcommand for System Halt messages (data[5] = 0x01)
+SYSTEM_HALT_SUBCMD = 0x01
+
+# Index of the status byte within the data payload for Go/Stop messages (subcommand 0x00)
+GO_STOP_STATUS_INDEX = 8 # For CAN ID 0x00000000, subcommand 0x00, data[8] is the status
+
+# Status values for Go/Stop messages
+SYSTEM_GO = 0x01  # Data[8] = 0x01 means "Go"
+SYSTEM_STOP = 0x00 # Data[8] = 0x00 means "Stop"
+
+# Query Packet (a simple placeholder, actual Märklin query would be a CAN frame)
+QUERY_PACKET = b'ping'
