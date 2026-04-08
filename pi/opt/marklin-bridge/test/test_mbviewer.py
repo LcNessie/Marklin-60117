@@ -76,7 +76,7 @@ class TestCursesUI(unittest.TestCase):
 
     def test_draw_waiting_for_message(self):
         """Test drawing when waiting for the first message."""
-        self.ui.draw(None, "CONNECTING")
+        self.ui.draw(None, "CONNECTING", None)
         # Use ANY for line number to accommodate layout changes
         self.mock_stdscr.addstr.assert_any_call(ANY, 0, "Waiting for first status message...", self.ui.COLOR_PAIR_YELLOW)
 
@@ -97,7 +97,7 @@ class TestCursesUI(unittest.TestCase):
             'marklin_interface': 'wlan0',
             'home_interface': 'eth0'
         }
-        self.ui.draw(status_data, "CONNECTED")
+        self.ui.draw(status_data, "CONNECTED", None)
         
         # Use ANY for line numbers as layout is complex. Verify headers and content.
         self.mock_stdscr.addstr.assert_any_call(ANY, 0, "-- Bridge --", self.ui.COLOR_PAIR_DEFAULT)
@@ -129,7 +129,7 @@ class TestCursesUI(unittest.TestCase):
             'link_status': 'DOWN', 'track_power': 'UNKNOWN',
             'interface_status': {}
         }
-        self.ui.draw(status_data, "CONNECTED")
+        self.ui.draw(status_data, "CONNECTED", None)
 
         # Verify icons for Box Down scenario
         self.mock_stdscr.addstr.assert_any_call(ANY, 24, "🔴 DOWN", self.ui.COLOR_PAIR_RED)
@@ -139,7 +139,7 @@ class TestCursesUI(unittest.TestCase):
         """Test that draw method handles curses errors gracefully."""
         self.mock_stdscr.erase.side_effect = self.mock_curses.error
         try:
-            self.ui.draw({}, "CONNECTED")
+            self.ui.draw({}, "CONNECTED", None)
         except self.mock_curses.error:
             self.fail("Curses error was not handled gracefully (it was re-raised).")
 

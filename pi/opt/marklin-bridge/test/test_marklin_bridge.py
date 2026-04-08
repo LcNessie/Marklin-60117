@@ -120,7 +120,8 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.assertIn("Starting Märklin UDP Bridge", cm.output[0])
 
         # --- Assert ---
-        mock_coloredlogs.install.assert_called_once_with(level='INFO', fmt=ANY)
+        # The root logger level is set to DEBUG in the method, which coloredlogs should inherit.
+        mock_coloredlogs.install.assert_called_once_with(level=logging.DEBUG, fmt=ANY)
         # Assert that our custom formatter was not instantiated, proving we didn't enter the 'else' block.
         mock_formatter.assert_not_called()
 

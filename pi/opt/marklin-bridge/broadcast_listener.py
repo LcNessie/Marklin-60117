@@ -9,24 +9,27 @@ import socket
 PORT = 15731
 HOST = '0.0.0.0' # Listen on all interfaces
 
-# Create a UDP socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def listen_loop():
+    """Creates a socket and enters a loop to listen for UDP broadcasts."""
+    # Create a UDP socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Allow receiving broadcast packets
-s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    try:
+        # Allow receiving broadcast packets
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        # Allow reusing addresses, helpful for quick restarts
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((HOST, PORT))
+        print(f"Listening for UDP broadcasts on port {PORT}...")
+        while True:
+            data, addr = s.recvfrom(1024)
+            print(f"Received packet from {addr}: {data.hex()}")
+    except KeyboardInterrupt:
+        print("\nExiting.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        s.close()
 
-# Allow reusing addresses, helpful for quick restarts
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-try:
-    s.bind((HOST, PORT))
-    print(f"Listening for UDP broadcasts on port {PORT}...")
-    while True:
-        data, addr = s.recvfrom(1024)
-        print(f"Received packet from {addr}: {data.hex()}")
-except KeyboardInterrupt:
-    print("\nExiting.")
-except Exception as e:
-    print(f"An error occurred: {e}")
-finally:
-    s.close()
+if __name__ == "__main__":
+    listen_loop()
