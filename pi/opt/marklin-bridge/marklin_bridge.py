@@ -89,7 +89,8 @@ class MarklinBridgeApp:
             logger.addHandler(handler)
         else: # Default to stderr for journald
             if coloredlogs:
-                coloredlogs.install(level='INFO', fmt=log_fmt)
+                # Use the level already set on the root logger
+                coloredlogs.install(level=logger.level, fmt=log_fmt)
             else:
                 handler = logging.StreamHandler()
                 handler.setFormatter(self.ColoredFormatter())
