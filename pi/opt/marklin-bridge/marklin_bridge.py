@@ -206,12 +206,12 @@ class MarklinBridgeApp:
                 logging.warning("Link to Märklin interface lost (timeout).")
                 self._publish_status()
 
-        # Temporarily disable active probing to isolate broadcast reception.
-        # should_probe = (self.link_status == constants.STATUS_DOWN) or (time_since_last_packet > constants.QUERY_INTERVAL_S)
-        # if should_probe and (time.time() - self.last_query_time > constants.QUERY_INTERVAL_S):
-        #     logging.debug("Sending query packet to %s", config.MARKLIN_IP)
-        #     self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
-        #     self.last_query_time = time.time()
+        # If the link is down or idle, send a query packet to elicit a response.
+        should_probe = (self.link_status == constants.STATUS_DOWN) or (time_since_last_packet > constants.QUERY_INTERVAL_S)
+        if should_probe and (time.time() - self.last_query_time > constants.QUERY_INTERVAL_S):
+            logging.debug("Sending query packet to %s", config.MARKLIN_IP)
+            self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
+            self.last_query_time = time.time()
 
     def _handle_marklin_packet(self, data):
         # Log every packet from the Märklin box at DEBUG level for diagnostics
@@ -342,7 +342,6 @@ class MarklinBridgeApp:
 
             self.set_led_color(led.COLOR_YELLOW_NO_LINK)
             self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
-            self.last_marklin_packet_time = time.time()
             self.last_query_time = time.time()
 
             self._main_loop()

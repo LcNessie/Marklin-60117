@@ -103,3 +103,31 @@ This will show any startup errors (like problems with `config.ini` or network so
 ## Check Dependencies
 
 The service depends on the network. Ensure that you can `ping` the Märklin interface IP address from your `config.ini`. If using the status LED, ensure the `marklin-bridge` user has GPIO access. If the logs show errors related to `gpiod` or `/dev/gpiochip0`, there may be a permissions issue or the library may not be installed correctly.
+
+## Advanced Network Diagnostics with `tcpdump`
+
+If the bridge's logs show that the UDP link is `DOWN` or that it is not receiving "Go"/"Stop" commands even though the link is `UP`, the problem may be at the operating system or network level (e.g., a firewall).
+
+You can use the `tcpdump` tool to see exactly what packets are arriving at the Raspberry Pi's network interface, bypassing the Python application entirely.
+
+1.  **Install `tcpdump`:**
+
+    ```bash
+    sudo apt-get update && sudo apt-get install tcpdump
+    ```
+
+2.  **Run `tcpdump` to monitor the Märklin interface:**
+
+    Replace `wlan0` with the interface name from your `config.ini` if it's different.
+
+    ```bash
+    sudo tcpdump -i wlan0 -n -vvv udp port 15731
+    ```
+
+3.  **Test your controller:** While `tcpdump` is running, press the "Go" and "Stop" buttons on your Märklin controller.
+
+**Interpreting the Output:**
+-   **If you see packets appear** in the `tcpdump` output when you press the buttons, it means the network and OS are working correctly, and the problem is likely within the Python application's logic.
+-   **If you see NO packets appear** when you press the buttons, it confirms the packets are not reaching the Pi's operating system. This points to a firewall issue on the Pi, a problem with the WiFi connection, or an issue with the Märklin box itself.
+
+The service depends on the network. Ensure that you can `ping` the Märklin interface IP address from your `config.ini`. If using the status LED, ensure the `marklin-bridge` user has GPIO access. If the logs show errors related to `gpiod` or `/dev/gpiochip0`, there may be a permissions issue or the library may not be installed correctly.
