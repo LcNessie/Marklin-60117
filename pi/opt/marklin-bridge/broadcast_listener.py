@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import socket
 
 # This script is a minimal UDP broadcast listener for debugging purposes.

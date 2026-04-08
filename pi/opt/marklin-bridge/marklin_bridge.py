@@ -342,6 +342,7 @@ class MarklinBridgeApp:
 
             self.set_led_color(led.COLOR_YELLOW_NO_LINK)
             self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
+            self.last_marklin_packet_time = time.time()
             self.last_query_time = time.time()
 
             self._main_loop()
