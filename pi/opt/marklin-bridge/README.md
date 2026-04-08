@@ -7,7 +7,7 @@ A Python-based application for Märklin CAN-over-UDP traffic, designed to run on
 - [Features](#features)
 - [Requirements](#requirements)
 - [Usage](#usage)
-- [License](#license)
+- [License](LICENSE)
 - [Installation and Setup Guide](Documentation/INSTALL.md)
 - [Troubleshooting Guide](Documentation/TROUBLESHOOTING.md)
 - [Status Monitor Guide](Documentation/MBVIEWER.md)
@@ -18,40 +18,40 @@ A Python-based application for Märklin CAN-over-UDP traffic, designed to run on
 
 ## Features
 
-* **Two Operating Modes:**
-  * **UDP Bridge:** Directly relays UDP packets between a control computer and the Märklin network interface.
-  * **MQTT Gateway:** A more robust mode that translates the UDP traffic from the Märklin interface into MQTT messages, publishing them to a broker. It also subscribes to a topic to receive commands and send them via UDP to the Märklin interface. This decouples your control software from the bridge.
-* **Visual Status LED:** Uses an RGB LED to show the current system state:
-  * **Green:** Track power is ON (Go).
-  * **Red:** Track power is OFF (Stop).
-  * **Yellow:** No packets received from the Märklin interface within a timeout period (link down).
-* **MQTT Status Reporting:** Periodically publishes the bridge's status (link, power, packet counts) to a configurable MQTT topic, allowing for remote monitoring and diagnostics.
-* **Active Link Probing:** When the link to the Märklin interface goes down, the script actively sends "ping" packets to re-establish the connection and status as quickly as possible.
-* **Optional GPIO:** The status LED functionality can be completely disabled in the configuration, allowing the script to run on hardware without GPIO access.
-* **Headless Operation:** Designed to run as a `systemd` service for reliable, headless operation.
-* **Modern GPIO Control:** Uses the standard `libgpiod` library to control the status LED, ensuring compatibility with modern Raspberry Pi OS versions.
+- **Two Operating Modes:**
+  - **UDP Bridge:** Directly relays UDP packets between a control computer and the Märklin network interface.
+  - **MQTT Gateway:** A more robust mode that translates the UDP traffic from the Märklin interface into MQTT messages, publishing them to a broker. It also subscribes to a topic to receive commands and send them via UDP to the Märklin interface. This decouples your control software from the bridge.
+- **Visual Status LED:** Uses an RGB LED to show the current system state:
+  - **Green:** Track power is ON (Go).
+  - **Red:** Track power is OFF (Stop).
+  - **Yellow:** No packets received from the Märklin interface within a timeout period (link down).
+- **MQTT Status Reporting:** Periodically publishes the bridge's status (link, power, packet counts) to a configurable MQTT topic, allowing for remote monitoring and diagnostics.
+- **Active Link Probing:** When the link to the Märklin interface goes down, the script actively sends "ping" packets to re-establish the connection and status as quickly as possible.
+- **Optional GPIO:** The status LED functionality can be completely disabled in the configuration, allowing the script to run on hardware without GPIO access.
+- **Headless Operation:** Designed to run as a `systemd` service for reliable, headless operation.
+- **Modern GPIO Control:** Uses the standard `libgpiod` library to control the status LED, ensuring compatibility with modern Raspberry Pi OS versions.
 
 ## Requirements
 
 ### Hardware
 
-* Raspberry Pi (any model with GPIO pins).
-* A common-anode or common-cathode RGB LED.
-* Appropriate current-limiting resistors for the LED.
-* Märklin network interface (e.g., 60117) and a control PC on the same network.
+- Raspberry Pi (any model with GPIO pins).
+- A common-anode or common-cathode RGB LED.
+- Appropriate current-limiting resistors for the LED.
+- Märklin network interface (e.g., 60117) and a control PC on the same network.
 
 ### Software
 
-* Python 3
-* A Debian-based OS like Raspberry Pi OS.
-* The `libgpiod` library and its Python bindings, which are standard on recent Raspberry Pi OS versions.
-* The Python libraries listed in `requirements.txt`, which support the application's optional features (LED status, MQTT mode, etc.).
+- Python 3
+- A Debian-based OS like Raspberry Pi OS.
+- The `libgpiod` library and its Python bindings, which are standard on recent Raspberry Pi OS versions.
+- The Python libraries listed in `requirements.txt`, which support the application's optional features (LED status, MQTT mode, etc.).
 
 ## Getting Started
 
-* **[Installation and Setup Guide](Documentation/INSTALL.md)**
-* **[Troubleshooting Guide](Documentation/TROUBLESHOOTING.md)**
-* **[Making the System Robust (Read-Only Filesystem)](Documentation/ROBUSTNESS.md)**
+- **[Installation and Setup Guide](Documentation/INSTALL.md)**
+- **[Troubleshooting Guide](Documentation/TROUBLESHOOTING.md)**
+- **[Making the System Robust (Read-Only Filesystem)](Documentation/ROBUSTNESS.md)**
 
 ## Usage
 
