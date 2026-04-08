@@ -33,7 +33,7 @@ class TestBroadcastListener(unittest.TestCase):
         mock_socket_instance.setsockopt.assert_has_calls(expected_calls, any_order=True)
 
         # 3. Check bind call
-        mock_socket_instance.bind.assert_called_once_with(('0.0.0.0', 15731))
+        mock_socket_instance.bind.assert_called_once_with(('0.0.0.0', 15730))
 
         # 4. Check that close was called on exit
         mock_socket_instance.close.assert_called_once()

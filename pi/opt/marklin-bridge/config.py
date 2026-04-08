@@ -14,7 +14,8 @@ config = configparser.ConfigParser()
 config['Network'] = {
     'ControllerIP': '192.168.1.100',
     'MarklinIP': '192.168.160.1',
-    'Port': '15731',
+    'Port': '15731', # Destination port for sending commands to the Marklin box
+    'ListenPort': '15730', # Local port to listen on for all messages from the Marklin box
     'MarklinInterface': 'wlan0',
     'HomeInterface': 'eth0'
 }
@@ -57,6 +58,7 @@ except Exception:
 CONTROLLER_IP = config.get('Network', 'ControllerIP')
 MARKLIN_IP = config.get('Network', 'MarklinIP')
 PORT = config.getint('Network', 'Port')
+LISTEN_PORT = config.getint('Network', 'ListenPort')
 MARKLIN_INTERFACE = config.get('Network', 'MarklinInterface')
 HOME_INTERFACE = config.get('Network', 'HomeInterface')
 

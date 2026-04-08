@@ -3,10 +3,10 @@
 import socket
 
 # This script is a minimal UDP broadcast listener for debugging purposes.
-# It helps determine if broadcast packets are reaching the OS, independent
-# of the main marklin-bridge application.
+# It helps determine if broadcast packets (like Go/Stop) are reaching the OS
+# on the correct port (15730) after the main application has registered itself.
 
-PORT = 15731
+PORT = 15730 # Port where the Marklin box sends broadcasts and status updates
 HOST = '0.0.0.0' # Listen on all interfaces
 
 def listen_loop():

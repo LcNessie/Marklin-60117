@@ -106,15 +106,15 @@ class MarklinBridgeApp:
         self.status_led = led.create_led_instance(config.config)
 
     def _setup_network(self):
-        # Bind to '0.0.0.0' to receive packets on all interfaces, which is crucial
-        # for capturing UDP broadcasts from the Märklin box. Attempting to bind
-        # to a specific IP can prevent broadcast packets from being received.
-        logging.info(f"Binding UDP socket to 0.0.0.0:%s", config.PORT)
+        # Bind to '0.0.0.0' and the dedicated listening port (15730) to receive
+        # packets on all interfaces. This is crucial for capturing UDP broadcasts
+        # from the Märklin box after client registration.
+        logging.info(f"Binding UDP socket to 0.0.0.0:%s", config.LISTEN_PORT)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Enable receiving broadcast packets. This is crucial for seeing the
         # "Go" and "Stop" commands which are sent as broadcasts by the Märklin box.
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.sock.bind(("0.0.0.0", config.PORT))
+        self.sock.bind(("0.0.0.0", config.LISTEN_PORT))
         self.sock.setblocking(False)
 
     def _setup_mqtt(self):
@@ -341,6 +341,7 @@ class MarklinBridgeApp:
                 self._setup_mqtt()
 
             self.set_led_color(led.COLOR_YELLOW_NO_LINK)
+            # Send the initial registration/query packet to the send port (15731)
             self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
             self.last_marklin_packet_time = time.time()
             self.last_query_time = time.time()

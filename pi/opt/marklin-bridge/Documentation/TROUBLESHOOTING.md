@@ -120,8 +120,11 @@ You can use the `tcpdump` tool to see exactly what packets are arriving at the R
 
     Replace `wlan0` with the interface name from your `config.ini` if it's different.
 
+    This command listens for both direct replies (often on port 15731) and
+    broadcasts (on port 15730).
+
     ```bash
-    sudo tcpdump -i wlan0 -n -vvv udp port 15731
+    sudo tcpdump -i wlan0 -n -vvv "udp port 15730 or udp port 15731"
     ```
 
 3. **Test your controller:** While `tcpdump` is running, press the "Go" and "Stop" buttons on your Märklin controller.

@@ -66,6 +66,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.mock_config.MARKLIN_IP = '192.168.160.1'
         self.mock_config.CONTROLLER_IP = '192.168.1.100'
         self.mock_config.PORT = 15731
+        self.mock_config.LISTEN_PORT = 15730
         self.mock_config.MARKLIN_INTERFACE = 'wlan0'
         self.mock_config.HOME_INTERFACE = 'eth0'
         self.mock_config.MQTT_TOPIC_FROM_MARKLIN = 'marklin/from'
@@ -77,7 +78,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # Hardcoded constants
         self.mock_constants.CONNECTION_TIMEOUT_S = 10
         self.mock_constants.QUERY_INTERVAL_S = 5
-        self.mock_constants.QUERY_PACKET = b'ping'
+        self.mock_constants.QUERY_PACKET = b'\x00\x31\x47\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         # CAN frame constants
         self.mock_constants.FRAME_MIN_LENGTH = 13
         self.mock_constants.SYSTEM_CMD_CAN_ID = b'\x00\x00\x00\x00'
@@ -172,6 +173,33 @@ class TestMarklinBridgeApp(unittest.TestCase):
             "/var/log/test.log", maxBytes=expected_max_bytes, backupCount=3
         )
         mock_coloredlogs.install.assert_not_called()
+
+    def test_setup_network(self):
+        """Tests that the UDP socket is created and bound to the correct listening port."""
+        # --- Arrange ---
+        # Un-mock the socket for this test to allow the method to create it
+        self.app.sock = None
+        mock_socket_instance = MagicMock()
+
+        with patch('marklin_bridge.socket.socket', return_value=mock_socket_instance) as mock_socket_constructor:
+            # --- Act ---
+            self.app._setup_network()
+
+            # --- Assert ---
+            # 1. Socket created correctly
+            mock_socket_constructor.assert_called_once_with(socket.AF_INET, socket.SOCK_DGRAM)
+
+            # 2. Socket options set for broadcast
+            mock_socket_instance.setsockopt.assert_called_once_with(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+            # 3. Socket bound to the correct listening port and all interfaces
+            mock_socket_instance.bind.assert_called_once_with(("0.0.0.0", self.mock_config.LISTEN_PORT))
+
+            # 4. Socket is non-blocking
+            mock_socket_instance.setblocking.assert_called_once_with(False)
+
+            # 5. The app's socket attribute is set
+            self.assertEqual(self.app.sock, mock_socket_instance)
 
     def test_handle_marklin_go_packet(self):
         """
