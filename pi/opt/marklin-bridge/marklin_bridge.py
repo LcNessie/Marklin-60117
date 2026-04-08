@@ -206,11 +206,12 @@ class MarklinBridgeApp:
                 logging.warning("Link to Märklin interface lost (timeout).")
                 self._publish_status()
 
-        should_probe = (self.link_status == constants.STATUS_DOWN) or (time_since_last_packet > constants.QUERY_INTERVAL_S)
-        if should_probe and (time.time() - self.last_query_time > constants.QUERY_INTERVAL_S):
-            logging.debug("Sending query packet to %s", config.MARKLIN_IP)
-            self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
-            self.last_query_time = time.time()
+        # Temporarily disable active probing to isolate broadcast reception.
+        # should_probe = (self.link_status == constants.STATUS_DOWN) or (time_since_last_packet > constants.QUERY_INTERVAL_S)
+        # if should_probe and (time.time() - self.last_query_time > constants.QUERY_INTERVAL_S):
+        #     logging.debug("Sending query packet to %s", config.MARKLIN_IP)
+        #     self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
+        #     self.last_query_time = time.time()
 
     def _handle_marklin_packet(self, data):
         # Log every packet from the Märklin box at DEBUG level for diagnostics
