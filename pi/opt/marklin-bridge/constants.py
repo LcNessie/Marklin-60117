@@ -23,6 +23,7 @@ STATUS_UP = "UP"
 STATUS_DOWN = "DOWN"
 STATUS_UNKNOWN = "UNKNOWN"
 STATUS_NA = "N/A" # Not Applicable
+STATUS_NO_PSUTIL = "PSUTIL_MISSING" # Status when psutil is not installed
 
 # Märklin CAN Protocol Constants (based on known protocol details)
 # These are byte sequences or integer values derived from the Märklin CAN protocol.
@@ -49,5 +50,5 @@ GO_STOP_STATUS_INDEX = 8 # For CAN ID 0x00000000, subcommand 0x00, data[8] is th
 SYSTEM_GO = 0x01  # Data[8] = 0x01 means "Go"
 SYSTEM_STOP = 0x00 # Data[8] = 0x00 means "Stop"
 
-# Query Packet (a simple placeholder, actual Märklin query would be a CAN frame)
-QUERY_PACKET = b'ping'
+# Query Packet: A valid CAN "System Ping" frame (CAN-ID 0x00030000, DLC 0).
+QUERY_PACKET = b'\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'

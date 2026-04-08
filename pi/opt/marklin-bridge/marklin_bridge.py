@@ -105,8 +105,33 @@ class MarklinBridgeApp:
         self.status_led = led.create_led_instance(config.config)
 
     def _setup_network(self):
+        # New logic: Try to find the IP of the Märklin interface to bind to it specifically.
+        # This improves behavior on multi-homed systems (e.g., Pi with WiFi and Ethernet)
+        # by ensuring query packets are sent from the correct source IP/interface.
+        marklin_iface_ip = None
+        if config.MARKLIN_INTERFACE and config.MARKLIN_INTERFACE != constants.STATUS_NA:
+            # We need psutil to find the IP.
+            if self.network_status_checker.psutil_available:
+                ip, _, _ = self.network_status_checker.get_interface_info(config.MARKLIN_INTERFACE)
+                if ip and ip != constants.STATUS_NA:
+                    marklin_iface_ip = ip
+            else:
+                logging.warning(f"Cannot determine IP for interface '{config.MARKLIN_INTERFACE}' because psutil is not installed. Will bind to all interfaces (0.0.0.0).")
+
+        # Bind to the specific interface IP if found, otherwise fall back to 0.0.0.0
+        bind_ip = marklin_iface_ip if marklin_iface_ip else "0.0.0.0"
+        logging.info(f"Binding UDP socket to {bind_ip}:{config.PORT}")
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(("0.0.0.0", config.PORT))
+        try:
+            self.sock.bind((bind_ip, config.PORT))
+        except OSError as e:
+            logging.error(f"Failed to bind to {bind_ip}:{config.PORT}: {e}. This can happen if the interface is not up.")
+            if bind_ip != "0.0.0.0":
+                logging.warning("Falling back to binding on all interfaces (0.0.0.0).")
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Re-create socket
+                self.sock.bind(("0.0.0.0", config.PORT))
+            else:
+                raise # Re-raise if binding to 0.0.0.0 fails
         self.sock.setblocking(False)
 
     def _setup_mqtt(self):
