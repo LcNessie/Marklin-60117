@@ -50,5 +50,7 @@ GO_STOP_STATUS_INDEX = 8 # For CAN ID 0x00000000, subcommand 0x00, data[8] is th
 SYSTEM_GO = 0x01  # Data[8] = 0x01 means "Go"
 SYSTEM_STOP = 0x00 # Data[8] = 0x00 means "Stop"
 
-# Query Packet: A valid CAN "System Ping" frame (CAN-ID 0x00030000, DLC 0).
-QUERY_PACKET = b'\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+# Query Packet: A "Request for CAN-Bus-Member" frame. This is sent to the
+# Märklin box to elicit a response and establish that the link is active.
+# It corresponds to CAN-ID 0x00300000 with a Data Length Code (DLC) of 0.
+QUERY_PACKET = b'\x00\x30\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'

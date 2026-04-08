@@ -204,6 +204,7 @@ class MarklinBridgeApp:
 
         should_probe = (self.link_status == constants.STATUS_DOWN) or (time_since_last_packet > constants.QUERY_INTERVAL_S)
         if should_probe and (time.time() - self.last_query_time > constants.QUERY_INTERVAL_S):
+            logging.debug("Sending query packet to %s", config.MARKLIN_IP)
             self.sock.sendto(constants.QUERY_PACKET, (config.MARKLIN_IP, config.PORT))
             self.last_query_time = time.time()
 
