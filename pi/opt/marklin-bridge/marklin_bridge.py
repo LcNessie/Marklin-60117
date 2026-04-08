@@ -209,6 +209,9 @@ class MarklinBridgeApp:
             self.last_query_time = time.time()
 
     def _handle_marklin_packet(self, data):
+        # Log every packet from the Märklin box at DEBUG level for diagnostics
+        logging.debug(f"RX from {config.MARKLIN_IP}: {data.hex()}")
+
         if self.link_status != constants.STATUS_UP:
             self.link_status = constants.STATUS_UP
             logging.info("Link to Märklin interface established.")
@@ -242,7 +245,7 @@ class MarklinBridgeApp:
 
             # Log the parsed system command details for debugging
             status_val = data[constants.GO_STOP_STATUS_INDEX] if subcommand == constants.GO_STOP_SUBCMD and len(data) > constants.GO_STOP_STATUS_INDEX else 'N/A'
-            logging.debug(f"System command received: subcommand={hex(subcommand)}, status={hex(status_val) if status_val != 'N/A' else status_val}, derived_power_state={new_power_state}, raw_packet={data.hex()}")
+            logging.debug(f"-> Parsed as System Command: sub={hex(subcommand)}, status={hex(status_val) if status_val != 'N/A' else 'N/A'}, state={new_power_state}")
 
             # If a valid power state was detected and it's a change, update the system state
             if new_power_state and self.track_power != new_power_state:

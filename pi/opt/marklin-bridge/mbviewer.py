@@ -43,11 +43,11 @@ class CursesUI:
             self.COLOR_PAIR_RED = self.curses.color_pair(2)
             self.COLOR_PAIR_YELLOW = self.curses.color_pair(3)
 
-    def draw(self, status_data, connection_status):
+    def draw(self, status_data, connection_status, last_raw_message):
         """Draws the entire UI based on the application's state."""
         try:
             self.stdscr.erase()
-            self.stdscr.addstr(0, 0, f"Märklin Bridge Status Monitor", self.COLOR_PAIR_DEFAULT)
+            self.stdscr.addstr(0, 0, "Märklin Bridge Status Monitor", self.COLOR_PAIR_DEFAULT)
             next_line = 2
             
             # Helper to safely get data
@@ -176,10 +176,37 @@ class CursesUI:
             self.stdscr.addstr(next_line, 24, f"{conn_icon} {connection_status}", conn_color)
             next_line += 1
 
-            # --- Bridge Activity (Legacy Grouping Removed, merged into Core/Legs) ---
-            
-            self.stdscr.addstr(next_line + 1, 0, "Press 'q' or Ctrl+C to exit.", self.COLOR_PAIR_DEFAULT)
+            # --- Raw Message Display ---
+            next_line += 1
+            self.stdscr.addstr(next_line, 0, "-- Last Received MQTT Message --", self.COLOR_PAIR_DEFAULT)
+            next_line += 1
+
+            raw_message_end_line = self.curses.LINES - 2
+            if last_raw_message:
+                max_width = self.curses.COLS - 1
+                # Correctly handle multi-line strings from pretty-printed JSON
+                all_lines_to_print = []
+                for original_line in last_raw_message.splitlines():
+                    # Wrap any individual line that is too long for the screen
+                    sub_lines = [original_line[i:i+max_width] for i in range(0, len(original_line), max_width)]
+                    if not sub_lines: # Handle empty lines from splitlines()
+                        all_lines_to_print.append('')
+                    else:
+                        all_lines_to_print.extend(sub_lines)
+
+                for line_content in all_lines_to_print:
+                    if next_line <= raw_message_end_line:
+                        self.stdscr.addstr(next_line, 0, line_content, self.COLOR_PAIR_DEFAULT)
+                        next_line += 1
+                    else:
+                        break # Stop if we run out of screen space
+            else:
+                self.stdscr.addstr(next_line, 0, "No message received yet.", self.COLOR_PAIR_YELLOW)
+
+            # --- Footer ---
+            self.stdscr.addstr(self.curses.LINES - 1, 0, "Press 'q' or Ctrl+C to exit.", self.COLOR_PAIR_DEFAULT)
             self.stdscr.refresh()
+
         except self.curses.error:
             pass # Ignore screen resize errors
 
@@ -197,20 +224,24 @@ def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
 
 def on_message(client, userdata, msg):
     """Callback for when a status message is received."""
+    # Store the raw message for debugging
+    raw_payload = msg.payload.decode('utf-8', errors='ignore')
+    userdata['last_raw_message'] = raw_payload
     try:
-        userdata['status_data'] = json.loads(msg.payload)
+        userdata['status_data'] = json.loads(raw_payload)
     except json.JSONDecodeError:
         userdata['status_data'] = {"error": "Invalid JSON received"}
 
 def main_loop(stdscr, args):
     """The main application loop."""
     ui = CursesUI(stdscr)
-    
+
     # Userdata dict to share state with MQTT callbacks
     userdata = {
         'status_data': None,
         'connection_status': 'CONNECTING',
-        'topic': args.topic
+        'topic': args.topic,
+        'last_raw_message': None
     }
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, userdata=userdata)
@@ -236,7 +267,7 @@ def main_loop(stdscr, args):
     client.loop_start()
 
     while True:
-        ui.draw(userdata['status_data'], userdata['connection_status'])
+        ui.draw(userdata['status_data'], userdata['connection_status'], userdata['last_raw_message'])
         
         # Check for user input to quit
         try:
