@@ -111,6 +111,9 @@ class MarklinBridgeApp:
         # to a specific IP can prevent broadcast packets from being received.
         logging.info(f"Binding UDP socket to 0.0.0.0:%s", config.PORT)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Enable receiving broadcast packets. This is crucial for seeing the
+        # "Go" and "Stop" commands which are sent as broadcasts by the Märklin box.
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.sock.bind(("0.0.0.0", config.PORT))
         self.sock.setblocking(False)
 
