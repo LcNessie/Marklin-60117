@@ -83,6 +83,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.mock_constants.SYSTEM_CMD_CAN_ID = b'\x00\x00\x00\x00'
         self.mock_constants.GO_STOP_SUBCMD_INDEX = 5
         self.mock_constants.GO_STOP_SUBCMD = 0x00
+        self.mock_constants.SYSTEM_HALT_SUBCMD = 0x01
         self.mock_constants.GO_STOP_STATUS_INDEX = 8
         self.mock_constants.SYSTEM_GO = 0x01
         self.mock_constants.SYSTEM_STOP = 0x00
@@ -231,6 +232,39 @@ class TestMarklinBridgeApp(unittest.TestCase):
 
         # 3. In bridge mode, the packet should be forwarded to the controller
         self.app.sock.sendto.assert_called_once_with(stop_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
+
+        # 4. Should publish status (Power change only = 1 call)
+        self.app._publish_status.assert_called_once()
+
+    def test_handle_marklin_halt_packet(self):
+        """
+        Tests the logic for when a 'System HALT' packet is received from the Märklin box.
+        This is another form of 'Stop'.
+        """
+        # --- Arrange ---
+        # Start with the link up and power on to see the state transition
+        self.app.link_status = self.mock_constants.STATUS_UP
+        self.app.track_power = "GO"
+        # This is a valid CAN frame for "System Halt" (subcommand 0x01)
+        halt_packet = b'\x00\x00\x00\x00\x04\x01\x00\x00\x00\x00\x00\x00\x00'
+
+        self.app._publish_status = MagicMock()
+
+        # --- Act ---
+        self.app._handle_marklin_packet(halt_packet)
+
+        # --- Assert ---
+        # 1. State variables should be updated
+        self.assertEqual(self.app.link_status, self.mock_constants.STATUS_UP) # Link should remain UP
+        self.assertEqual(self.app.track_power, "STOP")
+        self.assertEqual(self.app.packets_from_marklin, 1)
+        self.assertEqual(self.app.last_marklin_packet_time, 1000.0)
+
+        # 2. The LED should be set to red
+        self.app.status_led.set_color.assert_called_with(led.COLOR_RED_STOP)
+
+        # 3. In bridge mode, the packet should be forwarded to the controller
+        self.app.sock.sendto.assert_called_once_with(halt_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
 
         # 4. Should publish status (Power change only = 1 call)
         self.app._publish_status.assert_called_once()

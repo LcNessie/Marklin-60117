@@ -44,6 +44,30 @@ The dashboard is divided into three sections to help you isolate the problem:
 3. **Network Side:** Diagnoses the connection to your LAN or MQTT Broker.
     - **Bridge MQTT Status:** If `🔴 FAILED`, the service cannot connect to your broker.
 
+### Track Power is `UNKNOWN` but UDP Link is `UP`
+
+This is a common state after the bridge first starts. It means the bridge is receiving data from the Märklin box, but it has not yet seen a specific "System Go" or "System Stop" command packet.
+
+The Märklin system typically only broadcasts these packets when the power state *changes*.
+
+**Solution:** Use your controller (e.g., Mobile Station, Central Station, or control software) to press "Go" or "Stop". This will send the command, the bridge will see it, and the status will update to 🟢 `GO` or 🔴 `STOP`.
+
+### Status Monitor shows "Waiting for first status message..."
+
+If the `mbviewer` connects successfully to the broker (`Viewer MQTT: 🟢 CONNECTED`) but remains on this screen, it means the `marklin-bridge` service has not published any status information.
+
+This is almost always because the service is not configured to use MQTT. By default, the bridge operates in a simpler "UDP Bridge" mode.
+
+**Solution:**
+
+1. Edit the configuration file: `sudo nano /opt/marklin-bridge/config.ini`
+2. Find the `[MQTT]` section.
+3. Set `Enabled = true`.
+4. Ensure `BrokerIP` points to your MQTT server (use `127.0.0.1` if it's on the same Pi).
+5. Restart the service: `sudo systemctl restart marklin-bridge.service`
+
+The viewer should begin displaying data within a few seconds.
+
 ## View the Logs
 
 To see the full output from the script, use `journalctl`.

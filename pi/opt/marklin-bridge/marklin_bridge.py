@@ -218,19 +218,31 @@ class MarklinBridgeApp:
         else:
             self.sock.sendto(data, (config.CONTROLLER_IP, config.PORT))
 
-        if len(data) >= constants.FRAME_MIN_LENGTH and data[0:4] == constants.SYSTEM_CMD_CAN_ID and data[constants.GO_STOP_SUBCMD_INDEX] == constants.GO_STOP_SUBCMD:
-            status = data[constants.GO_STOP_STATUS_INDEX]
-            new_power_state = constants.STATUS_UNKNOWN
-            if status == constants.SYSTEM_GO:
-                new_power_state = "GO"
-                self.set_led_color(led.COLOR_GREEN_GO)
-            elif status == constants.SYSTEM_STOP:
-                new_power_state = "STOP"
-                self.set_led_color(led.COLOR_RED_STOP)
+        # Check for system commands (CAN ID 0x00) that affect track power
+        if len(data) >= constants.FRAME_MIN_LENGTH and data[0:4] == constants.SYSTEM_CMD_CAN_ID:
+            subcommand = data[constants.GO_STOP_SUBCMD_INDEX]
+            new_power_state = None  # Use None to indicate no relevant state change found
 
-            if self.track_power != new_power_state and new_power_state != constants.STATUS_UNKNOWN:
+            # Case 1: Normal Go/Stop command (subcommand 0x00)
+            if subcommand == constants.GO_STOP_SUBCMD:
+                status = data[constants.GO_STOP_STATUS_INDEX]
+                if status == constants.SYSTEM_GO:
+                    new_power_state = "GO"
+                elif status == constants.SYSTEM_STOP:
+                    new_power_state = "STOP"
+
+            # Case 2: System Halt command (subcommand 0x01), also means STOP
+            elif subcommand == constants.SYSTEM_HALT_SUBCMD:
+                new_power_state = "STOP"
+
+            # If a valid power state was detected and it's a change, update the system state
+            if new_power_state and self.track_power != new_power_state:
                 self.track_power = new_power_state
                 logging.info(f"Track power state changed to: {self.track_power}")
+                if self.track_power == "GO":
+                    self.set_led_color(led.COLOR_GREEN_GO)
+                else:  # STOP
+                    self.set_led_color(led.COLOR_RED_STOP)
                 self._publish_status()
 
     def _process_packets(self):

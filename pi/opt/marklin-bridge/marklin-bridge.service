@@ -1,21 +1,27 @@
 [Unit]
-Description=Märklin UDP Bridge Service
-After=network.target pigpiod.service
-# BindsTo is stronger than Requires. If pigpiod is stopped, this service will also be stopped.
-BindsTo=pigpiod.service
+Description=Märklin UDP Bridge
+# This service should start after the network is ready.
+After=network-online.target
+# It's a good practice to state what this service wants, so systemd can manage dependencies.
+Wants=network-online.target
 
 [Service]
 Type=simple
+# Run as the dedicated, non-privileged user.
 User=marklin-bridge
+Group=marklin-bridge
+
+# The working directory for the script.
 WorkingDirectory=/opt/marklin-bridge
-ExecStart=/opt/marklin-bridge/venv/bin/python3 /opt/marklin-bridge/marklin_bridge.py
+
+# The command to start the service. It uses the python executable from the virtual environment.
+# The -u flag ensures that output is sent to the journal without buffering.
+ExecStart=/opt/marklin-bridge/venv/bin/python3 -u /opt/marklin-bridge/marklin_bridge.py
+
+# Restart the service if it fails, with a 5-second delay.
 Restart=on-failure
 RestartSec=5
 
-# Security Hardening: Restrict the service's access to the filesystem.
-ProtectSystem=full
-ProtectHome=true
-PrivateTmp=true
-
 [Install]
+# Enable the service to start at boot for the multi-user target.
 WantedBy=multi-user.target
