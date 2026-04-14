@@ -6,6 +6,11 @@ The Märklin 60117 WLAN box (or 60113 with a WiFi/LAN adapter) is a fantastic, b
 
 The primary intention of this project is to bridge that fixed 60117 access point directly to your native home network. Running on a Raspberry Pi, this robust Python-based application seamlessly translates and manages traffic between your control software (like Rocrail, iTrain), an MQTT broker, and the Märklin tracks.
 
+> **⚠️ Project Status**  
+> At least, that's my intention!  
+>  
+> Be aware that this is still in **Beta or even Alpha status**. But I'm slowly getting there...
+
 ---
 
 ### 🚂 Where to find the code and docs?
