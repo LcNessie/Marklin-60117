@@ -1,0 +1,32 @@
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Scripts and configs that MUST have Linux (LF) line endings
+*.sh text eol=lf
+*.bash text eol=lf
+*.conf text eol=lf
+.gitignore text eol=lf
+.dockerignore text eol=lf
+*.service text eol=lf
+*.py text eol=lf
+*.ini* text eol=lf
+
+# Standard text files (will get LF in repo, but native line endings on checkout)
+*.md text
+*.txt text
+*.json text
+*.yml text
+*.yaml text
+*.js text
+*.cpp text
+*.h text
+
+# Binary files that Git should never mess with
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.tar binary
+*.tgz binary
+*.gz binary
+*.zip binary

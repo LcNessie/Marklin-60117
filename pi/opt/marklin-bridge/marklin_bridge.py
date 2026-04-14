@@ -43,6 +43,7 @@ class MarklinBridgeApp:
         self.packets_from_mqtt = 0
         self.packets_to_mqtt = 0
         self.last_source = constants.STATUS_NA
+        self.last_controller_addr = None # Stores (ip, port) of the last seen controller
         self.mqtt_status = constants.STATUS_NA # Set by mqtt_handler
         self.interface_status = {}
 
@@ -229,8 +230,12 @@ class MarklinBridgeApp:
             self.mqtt_client.publish(config.MQTT_TOPIC_FROM_MARKLIN, data)
             self.packets_to_mqtt += 1
         else:
-            self.sock.sendto(data, (config.CONTROLLER_IP, config.PORT))
-
+            # In UDP Bridge mode, forward to the last known controller address.
+            if self.last_controller_addr:
+                self.sock.sendto(data, self.last_controller_addr)
+            else:
+                logging.warning("Received Märklin packet in bridge mode, but no controller address is known yet. Packet not forwarded.")
+ 
         # Check for system commands (CAN ID 0x00) that affect track power
         if len(data) >= constants.FRAME_MIN_LENGTH and data[0:4] == constants.SYSTEM_CMD_CAN_ID:
             subcommand = data[constants.GO_STOP_SUBCMD_INDEX]
@@ -276,6 +281,9 @@ class MarklinBridgeApp:
             # If the packet is from any other source (a controller),
             # forward it to the Märklin box, but ONLY in UDP Bridge mode.
             elif not config.MQTT_ENABLED:
+                # This is a packet from a controller.
+                # Store its address so we can send replies back to it.
+                self.last_controller_addr = addr
                 self.sock.sendto(data, (config.MARKLIN_IP, config.PORT))
                 self.packets_to_marklin += 1
 

@@ -33,6 +33,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.app.sock = MagicMock(spec=socket.socket)
         self.app.status_led = MagicMock(spec=led.AbstractLED)
         self.app.mqtt_client = MagicMock()
+        self.app.last_controller_addr = None
 
         # Mock time to control time-based logic (e.g., timeouts)
         self.time_patcher = patch('time.time')
@@ -212,6 +213,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # This is a valid CAN frame for "System Go"
         go_packet = b'\x00\x00\x00\x00\x05\x00\x00\x00\x01\x00\x00\x00\x00'
 
+        # In bridge mode, we must first have a known controller address
+        self.app.last_controller_addr = (self.mock_config.CONTROLLER_IP, 54321)
+
         self.app._publish_status = MagicMock()
 
         # --- Act ---
@@ -227,8 +231,8 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 2. The LED should be set to green
         self.app.status_led.set_color.assert_called_with(led.COLOR_GREEN_GO)
 
-        # 3. In bridge mode, the packet should be forwarded to the controller
-        self.app.sock.sendto.assert_called_once_with(go_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
+        # 3. In bridge mode, the packet should be forwarded to the controller's last known address
+        self.app.sock.sendto.assert_called_once_with(go_packet, self.app.last_controller_addr)
 
         # 4. Should publish status (Link UP + Power GO = 2 calls)
         self.assertEqual(self.app._publish_status.call_count, 2)
@@ -243,6 +247,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.app.track_power = "GO"
         # This is a valid CAN frame for "System Stop"
         stop_packet = b'\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00'
+
+        # In bridge mode, we must first have a known controller address
+        self.app.last_controller_addr = (self.mock_config.CONTROLLER_IP, 54321)
 
         self.app._publish_status = MagicMock()
 
@@ -259,8 +266,8 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 2. The LED should be set to red
         self.app.status_led.set_color.assert_called_with(led.COLOR_RED_STOP)
 
-        # 3. In bridge mode, the packet should be forwarded to the controller
-        self.app.sock.sendto.assert_called_once_with(stop_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
+        # 3. In bridge mode, the packet should be forwarded to the controller's last known address
+        self.app.sock.sendto.assert_called_once_with(stop_packet, self.app.last_controller_addr)
 
         # 4. Should publish status (Power change only = 1 call)
         self.app._publish_status.assert_called_once()
@@ -277,6 +284,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # This is a valid CAN frame for "System Halt" (subcommand 0x01)
         halt_packet = b'\x00\x00\x00\x00\x04\x01\x00\x00\x00\x00\x00\x00\x00'
 
+        # In bridge mode, we must first have a known controller address
+        self.app.last_controller_addr = (self.mock_config.CONTROLLER_IP, 54321)
+
         self.app._publish_status = MagicMock()
 
         # --- Act ---
@@ -292,11 +302,30 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 2. The LED should be set to red
         self.app.status_led.set_color.assert_called_with(led.COLOR_RED_STOP)
 
-        # 3. In bridge mode, the packet should be forwarded to the controller
-        self.app.sock.sendto.assert_called_once_with(halt_packet, (self.mock_config.CONTROLLER_IP, self.mock_config.PORT))
+        # 3. In bridge mode, the packet should be forwarded to the controller's last known address
+        self.app.sock.sendto.assert_called_once_with(halt_packet, self.app.last_controller_addr)
 
         # 4. Should publish status (Power change only = 1 call)
         self.app._publish_status.assert_called_once()
+
+    def test_handle_marklin_packet_bridge_mode_no_controller(self):
+        """
+        Tests that in bridge mode, if a Märklin packet is received before any
+        controller packet, it is not forwarded and a warning is logged.
+        """
+        # --- Arrange ---
+        self.mock_config.MQTT_ENABLED = False
+        self.app.last_controller_addr = None # Explicitly set to None
+        packet_from_marklin = b'some status data'
+
+        # --- Act & Assert ---
+        with self.assertLogs('root', level='WARNING') as cm:
+            self.app._handle_marklin_packet(packet_from_marklin)
+            self.assertIn("no controller address is known", cm.output[0])
+
+        # --- Assert ---
+        # The UDP socket should NOT be used to forward the packet.
+        self.app.sock.sendto.assert_not_called()
 
     def test_handle_marklin_packet_mqtt_mode(self):
         """
@@ -393,6 +422,9 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 2. The packet counter should be incremented
         self.assertEqual(self.app.packets_to_marklin, 1)
         self.assertEqual(self.app.last_source, self.mock_config.CONTROLLER_IP)
+
+        # 3. The controller's address should be stored for replies.
+        self.assertEqual(self.app.last_controller_addr, controller_addr)
 
     def test_process_packet_from_marklin(self):
         """
