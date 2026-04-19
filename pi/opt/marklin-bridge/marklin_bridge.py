@@ -233,6 +233,7 @@ class MarklinBridgeApp:
         if config.UDP_BRIDGE_ENABLED:
             # In UDP Bridge mode, forward to the last known controller address.
             if self.last_controller_addr:
+                # Yeet the packet back to the controller!
                 self.sock.sendto(data, self.last_controller_addr)
             else:
                 logging.warning("Received Märklin packet in bridge mode, but no controller address is known yet. Packet not forwarded.")
@@ -285,6 +286,7 @@ class MarklinBridgeApp:
                 # This is a packet from a controller.
                 # Store its address so we can send replies back to it.
                 self.last_controller_addr = addr
+                # Yeet the packet to the Märklin box!
                 self.sock.sendto(data, (config.MARKLIN_IP, config.PORT))
                 self.packets_to_marklin += 1
 
