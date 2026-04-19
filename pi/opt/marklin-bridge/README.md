@@ -18,9 +18,10 @@ A Python-based application for Märklin CAN-over-UDP traffic, designed to run on
 
 ## Features
 
-- **Two Operating Modes:**
-  - **UDP Bridge:** Directly relays UDP packets between a control computer and the Märklin network interface.
-  - **MQTT Gateway:** A more robust mode that translates the UDP traffic from the Märklin interface into MQTT messages, publishing them to a broker. It also subscribes to a topic to receive commands and send them via UDP to the Märklin interface. This decouples your control software from the bridge.
+- **Flexible Operating Modes (Can run simultaneously):**
+  - **UDP Bridge:** Directly relays UDP packets between a control computer (e.g., the 60667 Mobile Station) and the Märklin network interface.
+  - **MQTT Gateway:** Translates UDP traffic into MQTT messages for publishing, and subscribes to commands.
+  - **Hybrid / Monitor Mode:** Run both simultaneously to actively drive the layout via UDP while recording or analyzing the traffic stream via MQTT!
 - **Visual Status LED:** Uses an RGB LED to show the current system state:
   - **Green:** Track power is ON (Go).
   - **Red:** Track power is OFF (Stop).

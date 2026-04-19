@@ -1,6 +1,12 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import logging
+import sys
+
+# Mock external modules at a high level to ensure tests can be discovered.
+sys.modules['paho'] = MagicMock()
+sys.modules['paho.mqtt'] = MagicMock()
+sys.modules['paho.mqtt.client'] = MagicMock()
 
 # Local module imports
 import mqtt_handler

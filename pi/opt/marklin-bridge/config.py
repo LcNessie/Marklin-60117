@@ -12,7 +12,8 @@ config = configparser.ConfigParser()
 
 # Define default values
 config['Network'] = {
-    'ControllerIP': '192.168.1.100',
+    'UDPBridgeEnabled': 'true',
+    'ControllerIP': '192.168.1.161',
     'MarklinIP': '192.168.160.1',
     'Port': '15731', # Destination port for sending commands to the Marklin box
     'ListenPort': '15730', # Local port to listen on for all messages from the Marklin box
@@ -55,6 +56,7 @@ except Exception:
 # --- Exported Configuration Values ---
 
 # [Network]
+UDP_BRIDGE_ENABLED = config.getboolean('Network', 'UDPBridgeEnabled')
 CONTROLLER_IP = config.get('Network', 'ControllerIP')
 MARKLIN_IP = config.get('Network', 'MarklinIP')
 PORT = config.getint('Network', 'Port')

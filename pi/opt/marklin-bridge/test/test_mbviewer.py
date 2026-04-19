@@ -2,8 +2,11 @@ import sys
 import unittest
 from unittest.mock import Mock, patch, ANY
 
-# Mock the curses module at a high level to ensure tests can be discovered.
+# Mock external modules at a high level to ensure tests can be discovered.
 sys.modules['curses'] = Mock()
+sys.modules['paho'] = Mock()
+sys.modules['paho.mqtt'] = Mock()
+sys.modules['paho.mqtt.client'] = Mock()
 
 import mbviewer
 

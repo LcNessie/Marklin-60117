@@ -34,7 +34,7 @@ This guide provides detailed instructions for installing the Märklin UDP Bridge
     sudo -u marklin-bridge nano /opt/marklin-bridge/config.ini
     ```
 
-    Be sure to configure your network IPs and choose your operating mode (UDP Bridge or MQTT Gateway).
+    Be sure to configure your network IPs and choose your operating modes (you can enable UDP Bridge, MQTT Gateway, or both simultaneously).
 
 4. **Set Permissions:**
     Give the `marklin-bridge` user ownership of the entire application directory.

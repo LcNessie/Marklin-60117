@@ -63,9 +63,10 @@ class TestMarklinBridgeApp(unittest.TestCase):
     def _configure_default_mocks(self):
         """Sets up default values for our mocked config."""
         # Configurable values
-        self.mock_config.MQTT_ENABLED = False # Default to UDP Bridge mode
+        self.mock_config.MQTT_ENABLED = False
+        self.mock_config.UDP_BRIDGE_ENABLED = True
         self.mock_config.MARKLIN_IP = '192.168.160.1'
-        self.mock_config.CONTROLLER_IP = '192.168.1.100'
+        self.mock_config.CONTROLLER_IP = '192.168.1.161'
         self.mock_config.PORT = 15731
         self.mock_config.LISTEN_PORT = 15730
         self.mock_config.MARKLIN_INTERFACE = 'wlan0'
@@ -335,6 +336,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # --- Arrange ---
         # Enable MQTT mode
         self.mock_config.MQTT_ENABLED = True
+        self.mock_config.UDP_BRIDGE_ENABLED = False # Explicitly disable UDP bridge for this test
         self.app.link_status = self.mock_constants.STATUS_UP # Start with link up to isolate test
         packet_from_marklin = b'some status data'
 
@@ -354,6 +356,30 @@ class TestMarklinBridgeApp(unittest.TestCase):
         # 3. The packet counters should be incremented.
         self.assertEqual(self.app.packets_from_marklin, 1)
         self.assertEqual(self.app.packets_to_mqtt, 1)
+
+    def test_handle_marklin_packet_hybrid_mode(self):
+        """
+        Tests that in Hybrid mode (both MQTT and UDP Bridge enabled), a packet
+        from the Märklin box is BOTH published to MQTT and forwarded via UDP.
+        """
+        # --- Arrange ---
+        self.mock_config.MQTT_ENABLED = True
+        self.mock_config.UDP_BRIDGE_ENABLED = True
+        self.app.link_status = self.mock_constants.STATUS_UP
+        self.app.last_controller_addr = (self.mock_config.CONTROLLER_IP, 54321)
+        packet_from_marklin = b'some status data'
+
+        # --- Act ---
+        self.app._handle_marklin_packet(packet_from_marklin)
+
+        # --- Assert ---
+        # 1. The MQTT client should publish the message
+        self.app.mqtt_client.publish.assert_called_once_with(
+            self.mock_config.MQTT_TOPIC_FROM_MARKLIN,
+            packet_from_marklin
+        )
+        # 2. The UDP socket should ALSO forward the message
+        self.app.sock.sendto.assert_called_once_with(packet_from_marklin, self.app.last_controller_addr)
 
     def test_connection_health_timeout(self):
         """
@@ -506,7 +532,7 @@ class TestMarklinBridgeApp(unittest.TestCase):
         self.app.packets_to_marklin = 456
         self.app.packets_from_mqtt = 789
         self.app.packets_to_mqtt = 101
-        self.app.last_source = '192.168.1.100'
+        self.app.last_source = '192.168.1.161'
         self.app.interface_status = { 'wlan0': self.mock_constants.STATUS_UP }
         self.app.mqtt_status = "CONNECTED"
 

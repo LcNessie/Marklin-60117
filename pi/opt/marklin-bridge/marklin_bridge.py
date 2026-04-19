@@ -229,7 +229,8 @@ class MarklinBridgeApp:
         if config.MQTT_ENABLED:
             self.mqtt_client.publish(config.MQTT_TOPIC_FROM_MARKLIN, data)
             self.packets_to_mqtt += 1
-        else:
+            
+        if config.UDP_BRIDGE_ENABLED:
             # In UDP Bridge mode, forward to the last known controller address.
             if self.last_controller_addr:
                 self.sock.sendto(data, self.last_controller_addr)
@@ -280,7 +281,7 @@ class MarklinBridgeApp:
 
             # If the packet is from any other source (a controller),
             # forward it to the Märklin box, but ONLY in UDP Bridge mode.
-            elif not config.MQTT_ENABLED:
+            elif config.UDP_BRIDGE_ENABLED:
                 # This is a packet from a controller.
                 # Store its address so we can send replies back to it.
                 self.last_controller_addr = addr
